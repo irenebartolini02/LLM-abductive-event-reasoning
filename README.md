@@ -1,3 +1,34 @@
+# Related works
+
+## Fondamenta: Definizione del Task
+Prime formulazioni del Abductive Reasoning in NLP
+-  [**Abductive Commonsense Reasoning**](https://arxiv.org/pdf/1908.05739):
+    - È il gold standard che ha definito il formato "Osservazione 1 -> [Ipotesi] -> Osservazione 2" come un problema a scelta multipla.
+    - Introduce il dataset ART e dimostra che i modelli generativi (GPT-2 all'epoca) faticano a ragionare in modo non monotonico (abduttivo) rispetto a quello deduttivo.
+- [**e-CARE: a New Dataset for Exploring Explainable Causal Reasoning**](https://arxiv.org/pdf/2205.05849):
+    - Molto vicino al gruppo di ricerca che organizza il task (CASIA). Introduce un dataset enorme (>20k) di ragionamento causale con spiegazioni.
+    - Sposta il focus dalla semplice scelta multipla alla comprensione della causa profonda, un ponte perfetto verso l'Abductive Event Reasoning.
+
+## Metodologia: Event Graphs & Causal Knowledge
+Lavori degli stessi autori:
+- [**Learning Event Graph Knowledge for Abductive Reasoning**](https://aclanthology.org/2021.acl-long.403.pdf):
+    - Propone l'idea che per risolvere questi problemi non basta il testo grezzo, ma serve costruire un "grafo degli eventi" per capire le connessioni causali. È l'approccio "simbolico/strutturato" che spesso si contrappone o integra agli LLM puri.
+- **Event Causality Identification with Causal Graph (generico)**:
+    - Questo non è un paper, cercare i lavori di Pengfei Cao o Yubo Chen su "Event Causality Identification" (spesso pubblicati in ACL/EMNLP 2021-2023). Dimostrano che l'identificazione della causa diretta (il cuore del task AER) è un problema di estrazione di relazioni complesse.
+
+## Stato dell'Arte (SOTA) & LLM Era (2024-2025)
+Dimostrazione che il lavoro è aggiornato: per discutere di come GPT-4, Llama 3 o metodi come CoT (Chain-of-Thought) performano oggi su questo task.
+- [**Theorem-of-Thought: A Multi-Agent Framework for Abductive, Deductive, and Inductive Reasoning**](https://arxiv.org/pdf/2506.07106):
+    - È freschissimo (SOTA 2025). Propone un framework multi-agente dove uno specifico agente si occupa di "Abduction". Mostra che separare i tipi di ragionamento aiuta gli LLM a non allucinare.
+    - Dimostra che gli LLM "lisci" faticano ancora nell'abduzione pura rispetto alla deduzione.
+
+- [**UNcommonsense Reasoning: Abductive Reasoning about Uncommon Situations**](https://arxiv.org/pdf/2311.08469):
+    - Valuta GPT-4 su scenari abduttivi "non comuni". È perfetto per giustificare perché serve un benchmark su "Eventi Reali" (Real-world events) come quello di SemEval, dove il senso comune standard potrebbe non bastare.
+
+- [**Tackling LLM Hallucination with Abductive Reasoning**](https://www.preprints.org/manuscript/202511.1688):
+    - Collega il problema dell'AER alle allucinazioni. Puoi usarlo per dire: "Valutare l'Abductive Reasoning è critico perché il fallimento in questo task è spesso la causa delle allucinazioni negli scenari RAG".
+
+
 # Baselines Causal Reasoning Evaluation
 ## Gemma 2 9B Instruct
 
