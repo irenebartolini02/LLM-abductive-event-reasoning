@@ -168,10 +168,3 @@ content = content[:MAX_CHARS_PER_DOC] + "..."
 | Partial | 94     | 29.5%      |
 | Wrong   | 111    | 23.75%     |
 | Score   | 242.0  | 61.5%      |
-
-Total questions: 400
-Correct answers: 187 - 46.75%
-Partial answers: 118 - 29.5%
-Wrong answers: 95 - 23.75%
-Total score: 246.0
-Performance of the score: 61.5%
