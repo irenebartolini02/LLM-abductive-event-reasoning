@@ -104,6 +104,29 @@ content = content[:MAX_CHARS_PER_DOC] + "..."
 | Wrong   | 178    | 44.5%      |
 | Score   | 184.5  | 46.125%    |
 
+#### **Version B:**
+
+**Context building strategy**: Concatenating the first MAX_DOCS_PER_TOPIC Documents 
+"Doc {i}:\n
+Title: {doc.get('title')}\n
+Snippet: {doc.get('snippet')}\n  
+Content: {content}\n"
+
+the document content is truncated at MAX_CHARS_PER_DOC size
+
+content = content[:MAX_CHARS_PER_DOC] + "..."
+
+Total questions: 400
+
+**Results**
+|         | Number | Percentage |
+|---------|--------|------------|
+| Correct | 147    | 36.75%     |
+| Partial | 75     | 18.75%     |
+| Wrong   | 178    | 44.5%      |
+| Score   | 184.5  | 46.125%    |
+
+
 ## ⁠Hermes 3 - Llama 3.1 8B
 
 ## ⁠Qwen 2.5 7B Instruct
