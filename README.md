@@ -81,6 +81,28 @@ content = content[:MAX_CHARS_PER_DOC] + "..."
 ## ⁠Llama 3.1 8B Instruct (Meta)
 
 ## ⁠Solar 10.7B Instruct v1.0
+### **SYSTEM_PROMPT**: "You are solving SemEval 2026 Task 12: Abductive Event Reasoning. 
+    You are solving SemEval 2026 Task 12: Abductive Event Reasoning. 
+    Given an event, context documents, and four options (A–D),
+    choose which option(s) are the most plausible direct cause of the event. 
+    Respond ONLY with the letters of all correct options, 
+    separated by commas (e.g. 'A', 'A,B', or 'D'). 
+    Do not output any explanations.
+
+#### **Version A:**
+
+**Context building strategy**: Concatenating "--- Document {i} ---\nTitle: {doc.get('title')}\nText: {clean_text}\n\n until a maximum number of characters (6000)
+
+**Total Questions: 400**
+
+**Results**
+
+|         | Number | Percentage |
+|---------|--------|------------|
+| Correct | 147    | 36.75%     |
+| Partial | 75     | 18.75%     |
+| Wrong   | 178    | 44.5%      |
+| Score   | 184.5  | 46.125%    |
 
 ## ⁠Hermes 3 - Llama 3.1 8B
 
