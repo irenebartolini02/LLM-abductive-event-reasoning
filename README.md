@@ -141,7 +141,7 @@ Total questions: 400
 
 #### **Version A**
 
-**Context building strategy**: Concatenating "--- Document {i} ---\nTitle: {doc.get('title')}\nText: {clean_text}\n\n until a maximum number of characters (6000)
+**Context building strategy**: None
 
 **Total Questions: 400**
 
@@ -149,10 +149,10 @@ Total questions: 400
 
 |         | Number | Percentage |
 |---------|--------|------------|
-| Correct | 195    | 48.75%%    |
+| Correct | 195    | 48.75%     |
 | Partial | 94     | 23.5%      |
 | Wrong   | 111    | 27.750000000000004% |
-| Score   | 242.0  | 60.5%%     |
+| Score   | 242.0  | 60.5%      |
 
 #### **Version B**
 
@@ -176,3 +176,18 @@ content = content[:MAX_CHARS_PER_DOC] + "..."
 | Partial | 99     | 24.75%     |
 | Wrong   | 116    | 28.999999999999996% |
 | Score   | 234.5  | 58.62500000000001%  |
+
+#### **Version C**
+
+**Context building strategy**: Concatenating "--- Document {i} ---\nTitle: {doc.get('title')}\nText: {clean_text}\n\n until a maximum number of characters (6000)
+
+**Total Questions: 400**
+
+**Results**
+
+|         | Number | Percentage |
+|---------|--------|------------|
+| Correct | 195    | 46.75%     |
+| Partial | 94     | 29.5%      |
+| Wrong   | 111    | 23.75%     |
+| Score   | 242.0  | 61.5%      |
