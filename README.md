@@ -171,6 +171,21 @@ content = content[:MAX_CHARS_PER_DOC] + "..."
 | Wrong   | 169    | 42.35%      |
 | Score   | 181.5  | 45.49%    |
 
+#### **Version C**
+
+**Context building strategy**: Concatenating "--- Document {i} ---\nTitle: {doc.get('title')}\nText: {clean_text}\n\n until a maximum number of characters (6000)
+
+**Total Questions: 400**
+
+**Results**
+
+|         | Number | Percentage |
+|---------|--------|------------|
+| Correct | 142    | 35.5%     |
+| Partial | 68     | 17.0%      |
+| Wrong   | 190    | 47.5%     |
+| Score   | 176  | 44.0%      |
+
 ## ⁠Qwen 2.5 7B Instruct
 
 ### **SYSTEM_PROMPT**: 
