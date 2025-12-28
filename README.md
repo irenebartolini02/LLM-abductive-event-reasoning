@@ -107,6 +107,11 @@ content = content[:MAX_CHARS_PER_DOC] + "..."
 ## ⁠Hermes 3 - Llama 3.1 8B
 
 ## ⁠Qwen 2.5 7B Instruct
+caracteristics: autoregressive "decoder-only" causal masking
+parameters: 7.6 billion
+context windows: 128.000 tokens (~7.3 GB in KV Cache VRAM) 
+
+quantization: precision INT4 (0.5 byte) ~3.8 GB
 
 ### **SYSTEM_PROMPT**: 
     You are solving SemEval 2026 Task 12: Abductive Event Reasoning. 
