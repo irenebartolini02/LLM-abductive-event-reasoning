@@ -41,6 +41,38 @@ Dimostrazione che il lavoro è aggiornato: per discutere di come GPT-4, Llama 3 
  
 - [**Tree of Thoughts: Deliberate Problem Solving with Large Language Models**](https://arxiv.org/pdf/2305.10601)
     - we introduce a new framework for language model inference, “Tree of Thoughts” (ToT), which generalizes over the popular “Chain of Thought” approach to prompting language models, and enables exploration over coherent units of text (“thoughts”) that serve as intermediate steps toward problem solving. ToT allows LMs to perform deliberate decision making by considering multiple different reasoning paths and self-evaluating choices to decide the next course of action, as well as looking ahead or backtracking when necessary to make global choices.
+ 
+## Multi-Agentic RAG
+
+- [**Retrieval-Augmented Generation for Large Language Models: A Survey**](https://arxiv.org/pdf/2312.10997)
+      - This comprehensive review paper offers a detailed
+examination of the progression of RAG paradigms, encompassing
+the Naive RAG, the Advanced RAG, and the Modular RAG.
+It meticulously scrutinizes the tripartite foundation of RAG
+frameworks, which includes the retrieval, the generation and the
+augmentation techniques. The paper highlights the state-of-theart technologies embedded in each of these critical components,
+providing a profound understanding of the advancements in RAG
+systems.
+
+- [**Large Language Model based Multi-Agents: A Survey of Progress and Challenges**](https://arxiv.org/pdf/2402.01680)
+    - we present this
+survey to offer an in-depth discussion on the essential aspects of multi-agent systems based on LLMs,
+as well as the challenges.
+
+- [**Unleashing Diverse Thinking Modes in LLMs through Multi-Agent Collaboration**](https://arxiv.org/pdf/2510.16645)
+     - This paper introduces the
+Multi-Agent Collaboration Framework for Diverse Thinking Modes
+(DiMo), which enhances both performance and interpretability by
+simulating a structured debate among four specialized LLM agents.
+Each agent embodies a distinct reasoning paradigm, allowing the
+framework to collaboratively explore diverse cognitive approaches.
+Through iterative debate, agents challenge and refine initial responses,
+yielding more robust conclusions and an explicit, auditable reasoning chain
+
+- [**Reconstructing Context**](https://arxiv.org/pdf/2504.19754v1)
+    -  how can vast volumes of external knowledge be managed effectively within the input constraints of LLMs? Traditional methods address this by chunking external documents into smaller, fixedsize segments. While this approach alleviates input limitations, it often
+fragments context, resulting in incomplete retrieval and diminished coherence in generation. To overcome these shortcomings, two advanced
+techniques—late chunking and contextual retrieval—have been introduced, both aiming to preserve global context. 
 
 # Baselines Causal Reasoning Evaluation
 ## Gemma 2 9B Instruct
