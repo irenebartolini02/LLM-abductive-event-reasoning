@@ -1,4 +1,4 @@
-from sympy import re
+import re
 
 
 def clean_response(response_text):
