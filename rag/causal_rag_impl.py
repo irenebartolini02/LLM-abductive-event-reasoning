@@ -36,7 +36,7 @@ class CausalRAGSemEval:
         
         # Graph transformer
         self.transformer = LLMGraphTransformer(
-            llm=self.llm
+            llm=self.llm,
             # SPECIFICA SEMPRE I NODI: aiuta i modelli piccoli a non perdersi
             allowed_nodes=["Event", "Action", "Entity"],
             allowed_relationships=["CAUSES", "TRIGGERS", "LEADS_TO", "PRECEDES"]
