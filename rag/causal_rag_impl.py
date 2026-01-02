@@ -32,15 +32,16 @@ class CausalRAGSemEval:
             max_new_tokens=256,
             temperature=0.1,  # Bassa temperatura per risposte più deterministiche
         )
+        
         self.llm = HuggingFacePipeline(pipeline=pipe)
         
         # Graph transformer
         self.transformer = LLMGraphTransformer(
             llm=self.llm,
-            # SPECIFICA SEMPRE I NODI: aiuta i modelli piccoli a non perdersi
-            allowed_nodes=["Event", "Action", "Entity"],
-            allowed_relationships=["CAUSES", "TRIGGERS", "LEADS_TO", "PRECEDES"]
-            )
+            allowed_nodes=["Cause", "Effect", "Event"],
+            allowed_relationships=["CAUSES", "RESULTS_IN", "LEADS_TO"]
+        )
+
         
         # Setup embeddings
         self.embeddings = HuggingFaceEmbeddings(
@@ -51,60 +52,97 @@ class CausalRAGSemEval:
         self.vector_store = None
         self.node_to_content = {}
         
+    def extract_causal_graph_manual(self, text: str) -> List[Tuple[str, str, str]]:
+        """Estrae nodi e relazioni causali usando l'LLM direttamente"""
+        
+        prompt = f"""Analizza il seguente testo ed estrai tutti gli eventi causali.
+    Testo:
+    {text}
+
+    Istruzioni:
+    1. Identifica eventi/azioni nel testo
+    2. Trova relazioni causali (cosa causa cosa)
+    3. Formato risposta:
+    CAUSA: [evento che causa]
+    EFFETTO: [evento risultante]
+    ---
+    (ripeti per ogni relazione)
+
+    Risposta:"""
+
+        try:
+            response = self.llm.invoke(prompt)
+            return self._parse_causal_response(response)
+        except Exception as e:
+            print(f"Errore estrazione: {e}")
+            return []
+
+    def _parse_causal_response(self, response: str) -> List[Tuple[str, str, str]]:
+        """Parse della risposta LLM"""
+        relations = []
+        blocks = response.split('---')
+        
+        for block in blocks:
+            causa_match = re.search(r'CAUSA:\s*(.+)', block, re.IGNORECASE)
+            effetto_match = re.search(r'EFFETTO:\s*(.+)', block, re.IGNORECASE)
+            
+            if causa_match and effetto_match:
+                causa = causa_match.group(1).strip()
+                effetto = effetto_match.group(1).strip()
+                relations.append((causa, effetto, "CAUSES"))
+        
+        return relations
+
     def index_documents(self, documents: List[str]):
-        """
-        Indicizza tutti i documenti di un topic
-        """
+        """Versione modificata con estrazione manuale"""
+
         print(f"Indicizzando {len(documents)} documenti...")
         
-        # Chunking
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
             chunk_overlap=50,
         )
+        
         docs = [Document(page_content=doc) for doc in documents]
         chunks = text_splitter.split_documents(docs)
-        total_chunks = len(chunks)
         
         print(f"Creati {len(chunks)} chunks")
         
-        # Costruzione grafo (in batch per efficienza)
-        batch_size = 20
         node_contents = []
         node_ids = []
         
-        # Inizializziamo la barra di progresso
-        pbar = tqdm(total=total_chunks, desc="Estrazione Grafo", unit="chunk")
-
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i+batch_size]
+        pbar = tqdm(total=len(chunks), desc="Estrazione Grafo", unit="chunk")
+        
+        for chunk in chunks:
             try:
-                graph_documents = self.transformer.convert_to_graph_documents(batch)
+                # Estrazione manuale invece di transformer
+                relations = self.extract_causal_graph_manual(chunk.page_content)
                 
-                for graph_doc in graph_documents:
+                for causa, effetto, rel_type in relations:
                     # Aggiungi nodi
-                    for node in graph_doc.nodes:
-                        if node.id not in self.graph:
-                            self.graph.add_node(node.id)
-                            self.node_to_content[node.id] = node.id
-                            node_contents.append(node.id)
-                            node_ids.append(node.id)
+                    for node_text in [causa, effetto]:
+                        node_id = node_text[:100]  # Limita lunghezza ID
+                        if node_id not in self.graph:
+                            self.graph.add_node(node_id)
+                            self.node_to_content[node_id] = node_text
+                            node_contents.append(node_text)
+                            node_ids.append(node_id)
                     
-                    # Aggiungi relazioni
-                    for rel in graph_doc.relationships:
-                        self.graph.add_edge(
-                            rel.source.id,
-                            rel.target.id,
-                            relation=rel.type
-                        )
-                    # Aggiorniamo la barra con il numero di chunk processati in questo batch
-                    pbar.update(len(batch))
+                    # Aggiungi edge
+                    self.graph.add_edge(
+                        causa[:100], 
+                        effetto[:100], 
+                        relation=rel_type
+                    )
+                
+                pbar.update(1)
             except Exception as e:
-                print(f"Errore nel batch {i}-{i+batch_size}: {e}")
+                print(f"Errore chunk: {e}")
+                pbar.update(1)
                 continue
         
         pbar.close()
-        print("Estrazione grafo completata, salvataggio nel vector store...")
+        
         # Crea vector store
         if node_contents:
             self.vector_store = FAISS.from_texts(
@@ -114,9 +152,10 @@ class CausalRAGSemEval:
             )
             
             print(f"✓ Grafo creato: {self.graph.number_of_nodes()} nodi, "
-                  f"{self.graph.number_of_edges()} archi")
+                f"{self.graph.number_of_edges()} archi")
         else:
-            print("⚠ Nessun nodo estratto")
+            print("⚠ Nessun nodo estratto")   
+    
     
     def retrieve_relevant_nodes(self, event_text: str) -> List[str]:
         """
@@ -323,3 +362,4 @@ def evaluate_semeval_entry(causal_rag: CausalRAGSemEval, entry: Dict) -> Dict:
         "golden": golden,
         "results": results
     }
+
