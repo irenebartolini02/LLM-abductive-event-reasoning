@@ -55,20 +55,20 @@ class CausalRAGSemEval:
     def extract_causal_graph_manual(self, text: str) -> List[Tuple[str, str, str]]:
         """Estrae nodi e relazioni causali usando l'LLM direttamente"""
         
-        prompt = f"""Analizza il seguente testo ed estrai tutti gli eventi causali.
-    Testo:
+        prompt = f"""Analyze the following text and extract all causal events.
+    Text:
     {text}
 
-    Istruzioni:
-    1. Identifica eventi/azioni nel testo
-    2. Trova relazioni causali (cosa causa cosa)
-    3. Formato risposta:
-    CAUSA: [evento che causa]
-    EFFETTO: [evento risultante]
+    Instructions:
+    1. Identify events/actions in the text
+    2. Find causal relationships (what causes what)
+    3. Response format:
+    CAUSE: [causing event]
+    EFFECT: [resulting event]
     ---
-    (ripeti per ogni relazione)
+    (repeat for each relationship)
 
-    Risposta:"""
+    Response:"""
 
         try:
             response = self.llm.invoke(prompt)
@@ -102,7 +102,7 @@ class CausalRAGSemEval:
             chunk_size=500,
             chunk_overlap=50,
         )
-        
+
         docs = [Document(page_content=doc) for doc in documents]
         chunks = text_splitter.split_documents(docs)
         
@@ -222,22 +222,23 @@ class CausalRAGSemEval:
         
         return False, []
     
+
+    
     def check_causality_with_llm(self, cause: str, effect: str, 
                                  context: str) -> bool:
         """
-        Usa LLM per verificare la relazione causale con il contesto del grafo
+        Use LLM to verify the causal relationship with the graph context
         """
-        prompt = f"""Analizza se esiste una relazione causale basandoti sul contesto fornito.
+        prompt = f"""Analyze whether there is a causal relationship based on the context provided.
 
-Contesto dal grafo di conoscenza:
+Context from the knowledge graph:
 {context}
 
-Domanda: L'evento "{cause}" CAUSA o PORTA A "{effect}"?
+Question: Does the event "{cause}" CAUSE or LEAD TO "{effect}"?
 
-Rispondi SOLO con "SI" o "NO", seguito da una brevissima spiegazione (max 20 parole).
+Answer ONLY with "YES" or "NO", followed by a very brief explanation (max 20 words).
 
-Risposta:"""
-        
+Answer:"""
         try:
             response = self.llm.invoke(prompt).strip()
             
@@ -251,14 +252,29 @@ Risposta:"""
             if any(word in first_line for word in ['NO', 'FALSE', 'NON']):
                 return False
             
-            # Fallback: analisi più profonda
-            positive_keywords = ['causa', 'porta', 'determina', 'produce', 
-                               'influenza', 'precede', 'conseguenza']
+            # Fallback: deeper analysis
+            positive_keywords = ['caus', 'lead', 'determine', 'produce', 
+                               'influence', 'precede', 'consequence']
             return any(kw in response.lower() for kw in positive_keywords)
             
         except Exception as e:
-            print(f"Errore LLM: {e}")
+            print(f"LLM error: {e}")
             return False
+    
+
+    def create_path_summary(self, path: List[str]) -> str:
+        """
+        Crea un sommario del percorso causale per il contesto
+        """
+        summary_parts = []
+        for i in range(len(path) - 1):
+            edge_data = self.graph.get_edge_data(path[i], path[i+1])
+            if edge_data:
+                rel = edge_data.get('relation')
+                summary_parts.append(f"- {self.node_to_content.get(path[i], path[i])} {rel} {self.node_to_content.get(path[i+1], path[i+1])}")
+        
+        return "\n".join(summary_parts)
+    
     
     def is_causal_relation(self, cause: str, effect: str) -> Dict:
         """
@@ -280,8 +296,12 @@ Risposta:"""
         
         # Step 4: Costruisci contesto per LLM
         context_parts = []
+        is_causal = False
+        context = ""
+
         if has_path:
-            # Descrivi il percorso
+            # Fare il riassunto del percorso
+
             path_desc = " → ".join(path[:4])  # Limita lunghezza
             context_parts.append(f"Percorso nel grafo: {path_desc}")
             
@@ -291,22 +311,20 @@ Risposta:"""
                 if edge_data:
                     rel = edge_data.get('relation', 'collegato a')
                     context_parts.append(f"- {path[i]} {rel} {path[i+1]}")
-        else:
-            context_parts.append("Nessun percorso diretto trovato nel grafo.")
-            # Fornisci nodi rilevanti comunque
-            sample_nodes = list(relevant_nodes)[:5]
-            context_parts.append(f"Nodi rilevanti: {', '.join(sample_nodes)}")
+       
+            context = "\n".join(context_parts)
         
-        context = "\n".join(context_parts)
-        
-        # Step 5: Decisione finale con LLM
-        is_causal = self.check_causality_with_llm(cause, effect, context)
+            # Step 5: Final decision with LLM (only if path exists)
+             ## MANCA da fare il riassunto del contesto al posto di passare le relazioni 
+            is_causal = self.check_causality_with_llm(cause, effect, context)
+
         
         return {
             "is_causal": is_causal,
             "has_graph_path": has_path,
             "path": path if has_path else [],
-            "context": context
+            "context": context,
+            "context parts": context_parts  
         }
 
 
