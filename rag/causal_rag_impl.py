@@ -165,7 +165,7 @@ class CausalRAGSemEval:
                 # Manual extraction instead of transformer
                 relations = self.extract_causal_graph_manual(chunk.page_content)
                 
-                for cause, effect, rel_type in relations:
+                for cause, rel_type, effect in relations:
                     # Add nodes
                     for node_text in [cause, effect]:
                         node_id = node_text[:100]  # Limit ID length
@@ -177,8 +177,8 @@ class CausalRAGSemEval:
                     
                     # Add edge
                     self.graph.add_edge(
-                        cause[:100], 
-                        effect[:100], 
+                        cause, 
+                        effect, 
                         relation=rel_type
                     )
                 
