@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
+from tqdm import tqdm
 from transformers import pipeline
 import networkx as nx
 from typing import List, Set, Dict, Tuple
@@ -34,7 +35,12 @@ class CausalRAGSemEval:
         self.llm = HuggingFacePipeline(pipeline=pipe)
         
         # Graph transformer
-        self.transformer = LLMGraphTransformer(llm=self.llm)
+        self.transformer = LLMGraphTransformer(
+            llm=self.llm
+            # SPECIFICA SEMPRE I NODI: aiuta i modelli piccoli a non perdersi
+            allowed_nodes=["Event", "Action", "Entity"],
+            allowed_relationships=["CAUSES", "TRIGGERS", "LEADS_TO", "PRECEDES"]
+            )
         
         # Setup embeddings
         self.embeddings = HuggingFaceEmbeddings(
@@ -58,6 +64,7 @@ class CausalRAGSemEval:
         )
         docs = [Document(page_content=doc) for doc in documents]
         chunks = text_splitter.split_documents(docs)
+        total_chunks = len(chunks)
         
         print(f"Creati {len(chunks)} chunks")
         
@@ -66,6 +73,9 @@ class CausalRAGSemEval:
         node_contents = []
         node_ids = []
         
+        # Inizializziamo la barra di progresso
+        pbar = tqdm(total=total_chunks, desc="Estrazione Grafo", unit="chunk")
+
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i:i+batch_size]
             try:
@@ -87,10 +97,14 @@ class CausalRAGSemEval:
                             rel.target.id,
                             relation=rel.type
                         )
+                    # Aggiorniamo la barra con il numero di chunk processati in questo batch
+                    pbar.update(len(batch))
             except Exception as e:
                 print(f"Errore nel batch {i}-{i+batch_size}: {e}")
                 continue
         
+        pbar.close()
+        print("Estrazione grafo completata, salvataggio nel vector store...")
         # Crea vector store
         if node_contents:
             self.vector_store = FAISS.from_texts(
