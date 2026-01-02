@@ -1,5 +1,5 @@
 """
-Implementazione corretta di CausalRAG secondo il paper
+Implementazione CausalRAG per SemEval-2010 Task 8 (Causal Reasoning)
 """
 
 from langchain_community.llms import HuggingFacePipeline
@@ -10,49 +10,48 @@ from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from transformers import pipeline
 import networkx as nx
-from typing import List, Set, Dict
-import numpy as np
+from typing import List, Set, Dict, Tuple
+import re
 
-# ============================================================================
-# FASE 1: INDEXING (offline, prima della query)
-# ============================================================================
-
-class CausalRAG:
-    def __init__(self, model, tokenizer, k=3, s=3):
+class CausalRAGSemEval:
+    def __init__(self, model, tokenizer, k=3, s=2):
         """
         Args:
-            k: numero di nodi iniziali da recuperare (top-k similarity)
+            k: numero di nodi iniziali da recuperare
             s: step di espansione nel grafo
         """
         self.k = k
         self.s = s
         
         # Setup LLM
-        pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, 
-                       max_new_tokens=512)
+        pipe = pipeline(
+            "text-generation", 
+            model=model, 
+            tokenizer=tokenizer, 
+            max_new_tokens=256,
+            temperature=0.1,  # Bassa temperatura per risposte più deterministiche
+        )
         self.llm = HuggingFacePipeline(pipeline=pipe)
         
-        # Graph transformer - NON limitare solo a relazioni causali
-        # Il paper costruisce prima un grafo generale!
-        self.transformer = LLMGraphTransformer(
-            llm=self.llm,
-            # Rimuovi allowed_relationships per catturare TUTTE le relazioni
-        )
+        # Graph transformer
+        self.transformer = LLMGraphTransformer(llm=self.llm)
         
-        # Setup embeddings per il vector store
+        # Setup embeddings
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
         
         self.graph = nx.DiGraph()
         self.vector_store = None
-        self.node_to_content = {}  # Mappa node_id -> contenuto testuale
+        self.node_to_content = {}
         
     def index_documents(self, documents: List[str]):
         """
-        FASE 1: Indexing - costruisce il grafo base e il vector store
+        Indicizza tutti i documenti di un topic
         """
-        # 1.1 Chunking
+        print(f"Indicizzando {len(documents)} documenti...")
+        
+        # Chunking
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
             chunk_overlap=50,
@@ -60,58 +59,64 @@ class CausalRAG:
         docs = [Document(page_content=doc) for doc in documents]
         chunks = text_splitter.split_documents(docs)
         
-        # 1.2 Costruzione grafo generale (non solo causale!)
-        print("Costruendo grafo base...")
-        graph_documents = self.transformer.convert_to_graph_documents(chunks)
+        print(f"Creati {len(chunks)} chunks")
         
-        # 1.3 Popola il grafo NetworkX
+        # Costruzione grafo (in batch per efficienza)
+        batch_size = 20
         node_contents = []
         node_ids = []
         
-        for graph_doc in graph_documents:
-            # Aggiungi nodi
-            for node in graph_doc.nodes:
-                self.graph.add_node(node.id)
-                # Salva il contenuto per embedding
-                self.node_to_content[node.id] = node.id
-                node_contents.append(node.id)
-                node_ids.append(node.id)
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i+batch_size]
+            try:
+                graph_documents = self.transformer.convert_to_graph_documents(batch)
+                
+                for graph_doc in graph_documents:
+                    # Aggiungi nodi
+                    for node in graph_doc.nodes:
+                        if node.id not in self.graph:
+                            self.graph.add_node(node.id)
+                            self.node_to_content[node.id] = node.id
+                            node_contents.append(node.id)
+                            node_ids.append(node.id)
+                    
+                    # Aggiungi relazioni
+                    for rel in graph_doc.relationships:
+                        self.graph.add_edge(
+                            rel.source.id,
+                            rel.target.id,
+                            relation=rel.type
+                        )
+            except Exception as e:
+                print(f"Errore nel batch {i}-{i+batch_size}: {e}")
+                continue
+        
+        # Crea vector store
+        if node_contents:
+            self.vector_store = FAISS.from_texts(
+                texts=node_contents,
+                embedding=self.embeddings,
+                metadatas=[{"node_id": nid} for nid in node_ids]
+            )
             
-            # Aggiungi TUTTE le relazioni (non solo causali)
-            for rel in graph_doc.relationships:
-                self.graph.add_edge(
-                    rel.source.id, 
-                    rel.target.id, 
-                    relation=rel.type
-                )
-        
-        # 1.4 Crea vector store per i nodi
-        print(f"Indicizzando {len(node_contents)} nodi...")
-        self.vector_store = FAISS.from_texts(
-            texts=node_contents,
-            embedding=self.embeddings,
-            metadatas=[{"node_id": nid} for nid in node_ids]
-        )
-        
-        print(f"Grafo creato: {self.graph.number_of_nodes()} nodi, "
-              f"{self.graph.number_of_edges()} archi")
+            print(f"✓ Grafo creato: {self.graph.number_of_nodes()} nodi, "
+                  f"{self.graph.number_of_edges()} archi")
+        else:
+            print("⚠ Nessun nodo estratto")
     
-    # ========================================================================
-    # FASE 2: QUERY TIME - Discovering & Estimating Causal Paths
-    # ========================================================================
-    
-    def retrieve_initial_nodes(self, query: str) -> List[str]:
+    def retrieve_relevant_nodes(self, event_text: str) -> List[str]:
         """
-        Step 2.1: Trova i k nodi più simili alla query
+        Trova i k nodi più rilevanti per un evento
         """
-        results = self.vector_store.similarity_search_with_score(query, k=self.k)
-        node_ids = [doc.metadata["node_id"] for doc, _ in results]
-        print(f"Nodi iniziali (k={self.k}): {node_ids}")
-        return node_ids
+        if not self.vector_store:
+            return []
+        
+        results = self.vector_store.similarity_search(event_text, k=self.k)
+        return [doc.metadata["node_id"] for doc in results]
     
     def expand_nodes(self, initial_nodes: List[str]) -> Set[str]:
         """
-        Step 2.2: Espandi i nodi di s step lungo il grafo
+        Espandi i nodi di s step
         """
         expanded = set(initial_nodes)
         current_layer = set(initial_nodes)
@@ -119,7 +124,6 @@ class CausalRAG:
         for step in range(self.s):
             next_layer = set()
             for node in current_layer:
-                # Espandi sia predecessori che successori
                 if node in self.graph:
                     next_layer.update(self.graph.predecessors(node))
                     next_layer.update(self.graph.successors(node))
@@ -130,74 +134,178 @@ class CausalRAG:
             if not next_layer:
                 break
         
-        print(f"Nodi dopo espansione (s={self.s}): {len(expanded)} nodi")
         return expanded
     
-    def extract_causal_subgraph(self, nodes: Set[str]) -> nx.DiGraph:
+    def find_causal_path(self, cause: str, effect: str, 
+                        subgraph_nodes: Set[str]) -> Tuple[bool, List[str]]:
         """
-        Step 2.3: Estrai il sottografo e identifica relazioni causali
-        Qui è dove l'LLM analizza le relazioni per determinare causalità
+        Cerca un percorso causale tra causa ed effetto nel sottografo
         """
-        subgraph = self.graph.subgraph(nodes).copy()
-        causal_graph = nx.DiGraph()
+        # Trova nodi rilevanti per causa ed effetto
+        cause_nodes = self.vector_store.similarity_search(cause, k=2)
+        effect_nodes = self.vector_store.similarity_search(effect, k=2)
         
-        # Analizza ogni arco per determinare se è causale
-        for u, v, data in subgraph.edges(data=True):
-            relation = data.get('relation', '')
-            
-            # Prompt LLM per valutare causalità
-            # (Semplificato - nel paper usano analisi più sofisticata)
-            prompt = f"""Analizza se questa relazione è causale:
-Nodo A: {u}
-Relazione: {relation}
-Nodo B: {v}
+        cause_ids = [doc.metadata["node_id"] for doc in cause_nodes 
+                     if doc.metadata["node_id"] in subgraph_nodes]
+        effect_ids = [doc.metadata["node_id"] for doc in effect_nodes
+                      if doc.metadata["node_id"] in subgraph_nodes]
+        
+        if not cause_ids or not effect_ids:
+            return False, []
+        
+        # Cerca percorsi nel sottografo
+        subgraph = self.graph.subgraph(subgraph_nodes)
+        
+        for c_node in cause_ids:
+            for e_node in effect_ids:
+                try:
+                    # Cerca percorso diretto
+                    if nx.has_path(subgraph, c_node, e_node):
+                        path = nx.shortest_path(subgraph, c_node, e_node)
+                        if len(path) <= self.s + 1:  # Rispetta il limite di espansione
+                            return True, path
+                except:
+                    continue
+        
+        return False, []
+    
+    def check_causality_with_llm(self, cause: str, effect: str, 
+                                 context: str) -> bool:
+        """
+        Usa LLM per verificare la relazione causale con il contesto del grafo
+        """
+        prompt = f"""Analizza se esiste una relazione causale basandoti sul contesto fornito.
 
-La relazione indica che A causa/influenza B? Rispondi solo SI o NO."""
-            
-            try:
-                response = self.llm.invoke(prompt)
-                if "SI" in response.upper():
-                    causal_graph.add_edge(u, v, relation=relation)
-            except:
-                # Fallback: mantieni relazioni che sembrano causali
-                causal_keywords = ['causa', 'produce', 'genera', 'porta', 
-                                 'influenza', 'determina']
-                if any(kw in relation.lower() for kw in causal_keywords):
-                    causal_graph.add_edge(u, v, relation=relation)
+Contesto dal grafo di conoscenza:
+{context}
+
+Domanda: L'evento "{cause}" CAUSA o PORTA A "{effect}"?
+
+Rispondi SOLO con "SI" o "NO", seguito da una brevissima spiegazione (max 20 parole).
+
+Risposta:"""
         
-        print(f"Grafo causale: {causal_graph.number_of_edges()} relazioni causali")
-        return causal_graph
-    
-    # ========================================================================
-    # FASE 3: RETRIEVING CONTEXT CAUSALLY
-    # ========================================================================
-    
-    def generate_causal_summary(self, causal_graph: nx.DiGraph, 
-                               initial_nodes: List[str]) -> str:
-        """
-        Step 3: Genera un sommario causale tracciando i percorsi chiave
-        """
-        summary_parts = []
-        
-        # Trova percorsi causali dai nodi iniziali
-        for start_node in initial_nodes:
-            if start_node not in causal_graph:
-                continue
+        try:
+            response = self.llm.invoke(prompt).strip()
             
-            # Percorsi in uscita (cosa causa questo nodo)
-            for target in causal_graph.successors(start_node):
-                path_info = f"{start_node} → {target}"
-                edge_data = causal_graph.get_edge_data(start_node, target)
+            # Parsing della risposta
+            first_line = response.split('\n')[0].upper()
+            
+            # Cerca indicatori positivi
+            if any(word in first_line for word in ['SI', 'YES', 'TRUE', 'CAUSA']):
+                return True
+            # Cerca indicatori negativi
+            if any(word in first_line for word in ['NO', 'FALSE', 'NON']):
+                return False
+            
+            # Fallback: analisi più profonda
+            positive_keywords = ['causa', 'porta', 'determina', 'produce', 
+                               'influenza', 'precede', 'conseguenza']
+            return any(kw in response.lower() for kw in positive_keywords)
+            
+        except Exception as e:
+            print(f"Errore LLM: {e}")
+            return False
+    
+    def is_causal_relation(self, cause: str, effect: str) -> Dict:
+        """
+        Pipeline completa per verificare se causa → effetto
+        """
+        # Step 1: Recupera nodi rilevanti per entrambi gli eventi
+        cause_nodes = self.retrieve_relevant_nodes(cause)
+        effect_nodes = self.retrieve_relevant_nodes(effect)
+        
+        # Step 2: Espandi i nodi
+        expanded_cause = self.expand_nodes(cause_nodes)
+        expanded_effect = self.expand_nodes(effect_nodes)
+        
+        # Unisci i sottografi
+        relevant_nodes = expanded_cause.union(expanded_effect)
+        
+        # Step 3: Cerca percorso causale
+        has_path, path = self.find_causal_path(cause, effect, relevant_nodes)
+        
+        # Step 4: Costruisci contesto per LLM
+        context_parts = []
+        if has_path:
+            # Descrivi il percorso
+            path_desc = " → ".join(path[:4])  # Limita lunghezza
+            context_parts.append(f"Percorso nel grafo: {path_desc}")
+            
+            # Aggiungi relazioni del percorso
+            for i in range(len(path) - 1):
+                edge_data = self.graph.get_edge_data(path[i], path[i+1])
                 if edge_data:
-                    path_info += f" ({edge_data.get('relation', 'causa')})"
-                summary_parts.append(path_info)
+                    rel = edge_data.get('relation', 'collegato a')
+                    context_parts.append(f"- {path[i]} {rel} {path[i+1]}")
+        else:
+            context_parts.append("Nessun percorso diretto trovato nel grafo.")
+            # Fornisci nodi rilevanti comunque
+            sample_nodes = list(relevant_nodes)[:5]
+            context_parts.append(f"Nodi rilevanti: {', '.join(sample_nodes)}")
         
-        if not summary_parts:
-            return "Nessuna relazione causale diretta trovata."
+        context = "\n".join(context_parts)
         
-        summary = "Relazioni causali chiave:\n" + "\n".join(summary_parts)
-        return summary
+        # Step 5: Decisione finale con LLM
+        is_causal = self.check_causality_with_llm(cause, effect, context)
+        
+        return {
+            "is_causal": is_causal,
+            "has_graph_path": has_path,
+            "path": path if has_path else [],
+            "context": context
+        }
+
+
+# ============================================================================
+# UTILIZZO PER SEMEVAL
+# ============================================================================
+
+def evaluate_semeval_entry(causal_rag: CausalRAGSemEval, entry: Dict) -> Dict:
+    """
+    Valuta un entry SemEval con CausalRAG
+    """
+    target_event = entry["target_event"]
+    results = {}
     
-
-
-
+    print(f"\n{'='*60}")
+    print(f"Target Event: {target_event}")
+    print(f"{'='*60}\n")
+    
+    # Valuta ogni opzione
+    for option_key in ['option_A', 'option_B', 'option_C', 'option_D']:
+        option_text = entry[option_key]
+        option_label = option_key.split('_')[1]
+        
+        print(f"\n[Opzione {option_label}] {option_text}")
+        print("-" * 60)
+        
+        # Verifica causalità
+        result = causal_rag.is_causal_relation(
+            cause=option_text,
+            effect=target_event
+        )
+        
+        results[option_label] = result["is_causal"]
+        
+        print(f"✓ Causale: {result['is_causal']}")
+        print(f"  Path nel grafo: {result['has_graph_path']}")
+        if result['path']:
+            print(f"  Percorso: {' → '.join(result['path'][:3])}")
+    
+    # Predizione finale
+    predicted = [k for k, v in results.items() if v]
+    golden = entry["golden_answer"].split(',')
+    
+    print(f"\n{'='*60}")
+    print(f"Predicted: {','.join(predicted)}")
+    print(f"Golden:    {entry['golden_answer']}")
+    print(f"Match: {set(predicted) == set(golden)}")
+    print(f"{'='*60}\n")
+    
+    return {
+        "id": entry["id"],
+        "predicted": predicted,
+        "golden": golden,
+        "results": results
+    }
