@@ -313,7 +313,9 @@ Answer:"""
                     context_parts.append(f"- {path[i]} {rel} {path[i+1]}")
        
             context = "\n".join(context_parts)
-        
+
+            summary = self.create_path_summary(path)
+            print(f"Sommario percorso:\n{summary}\n")
             # Step 5: Final decision with LLM (only if path exists)
              ## MANCA da fare il riassunto del contesto al posto di passare le relazioni 
             is_causal = self.check_causality_with_llm(cause, effect, context)
