@@ -664,7 +664,8 @@ class CausalRAG:
         3. CONTEXTUAL GROUPING: If multiple chains share the same starting point or end goal, group them together to show the cumulative effect.
         4. AGNOSTIC TONE: Do not assume external knowledge. Stick strictly to the relationships defined in the provided chains, regardless of the topic (politics, science, history).
         5. NO FRAGMENTATION: Avoid using "Separately" unless the chains are logically and contextually disconnected.
-        6. FOCUS: Keep only details relevant to "{candidate_cause}" and "{target_event}"."""
+        6. REMOVE NOISE: Delete stock market numbers, unrelated locations, or general trivia.
+        7. FOCUS: Keep only details relevant to "{candidate_cause}" and "{target_event}"."""
 
         user_content = f"""RAW CONTEXT:
         {raw_context}
@@ -880,12 +881,12 @@ class CausalRAG:
 # ============================================================================
 
 
-def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, tipe_search="partial_paths") -> str:
+def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, type_search="partial_paths") -> str:
     """
-    Valuta un entry SemEval con CausalRAG
+    Genera un sommario causale di causa ed effetto utilizzando CausalRAG.
     """
     context = ""
-    if tipe_search=="full_paths":
+    if type_search=="full_paths":
         # Verifica causalità
         result = causal_rag.is_causal_relation(
                 cause=cause,
@@ -893,7 +894,7 @@ def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, tipe_search="
             )
         context = result['context']
         
-    if tipe_search=="partial_paths" or result['has_path']==False:
+    if type_search=="partial_paths" or result['has_path']==False:
         
         context = causal_rag.find_partial_causal_paths(
                 cause=cause,
