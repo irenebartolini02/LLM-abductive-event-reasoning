@@ -22,7 +22,8 @@ import json
 from rank_bm25 import BM25Okapi
 from difflib import SequenceMatcher
 
-class CausalRAG:
+
+class CausalRAG_local:
     def __init__(self, model, tokenizer, k=3, s=3):
         """
         Args:
@@ -54,7 +55,7 @@ class CausalRAG:
         self.node_to_content = {}
 
 #-------------------------------CREATE CAUSAL RAG---------------------------------------#
-    
+
     # RICHIESTA A QWEN PER ESTRARRE IL GRAFO
     def extract_causal_graph_manual(self, text: str) -> List[Tuple[str, str, str]]:
         """
@@ -77,6 +78,10 @@ class CausalRAG:
           - Don't be afraid to extract multiple small steps.
           - If you find NO relations, output exactly: [] (nothing else).
 
+          CRITICAL JSON RULE:
+           - NEVER use backslashes (\\).
+           - If you need to write mathematical terms like E_d(1,1), write them directly as "Ed(1,1)" or "E_d(1,1)" WITHOUT any LaTeX wrapping like \( \).
+           - Replace any backslash with a space or just remove it.
             """
 
 
@@ -85,12 +90,6 @@ class CausalRAG:
           1. NO MISSING LINKS: If a chain of events exists, extract every link.
           2. CONSISTENT NAMING: Use the same 'cause_atomic' name if the event repeats in the text.
           3. GRANULARITY: Extract at least 3-5 relations per paragraph if present.
-                    
-          Format your output as a VALID JSON LIST. 
-          STRICT RULES for JSON:
-            - Do not use backslashes (\) for escaping unless absolutely necessary for JSON syntax.
-            - Ensure all quotes are standard double quotes (").
-            - Output ONLY the raw JSON list, no preamble, no markdown code blocks, no explanation.
 
           FORMAT EXAMPLE:
           Text: "The heavy rain led to a flood which then caused the bridge to collapse."
@@ -136,9 +135,10 @@ class CausalRAG:
             return []
 
 
-    
+
     def _parse_causal_response(self, response: str) -> List[dict]:
-        """Parse the LLM response assuming a JSON list of objects.
+        """
+        Parse the LLM response assuming a JSON list of objects.
 
            Returns list of json:
 
@@ -171,31 +171,39 @@ class CausalRAG:
 
         # 2. Parsing (fuori dai blocchi if/else precedenti)
         try:
+
             data = json.loads(clean_json)
 
-            if isinstance(data, dict):
-                data = [data]
+        except json.JSONDecodeError as e:
+            # Se fallisce, stampiamo solo l'inizio per debug
+            try:
+              radical_clean = match_single.group(0).replace('\\', '') # Changed json_match to match_single
+              data = json.loads(radical_clean, strict=False)
+            except:
+              print(f"Errore fatale: {e}")
+              print(f"JSON Decode Error: {e} | Preview: {clean_json}...")
+              data=[]
+        except Exception as e:
+            print(f"General parsing error: {e}")
+            data=[]
 
-            for item in data:
-                # Controllo robusto delle chiavi (usiamo i nomi estratti dal tuo prompt)
-                c_atomic = item.get("cause_atomic")
-                rel = item.get("relation")
-                e_atomic = item.get("effect_atomic")
+        if isinstance(data, dict):
+              data = [data]
 
-                if c_atomic and rel and e_atomic:
+        for item in data:
+              # Controllo robusto delle chiavi (usiamo i nomi estratti dal tuo prompt)
+              c_atomic = item.get("cause_atomic")
+              rel = item.get("relation")
+              e_atomic = item.get("effect_atomic")
+
+              if c_atomic and rel and e_atomic:
                     relations.append({
                         "cause": str(c_atomic).strip(),
                         "cause_full": str(item.get("cause_full", c_atomic)).strip(),
                         "relation": str(rel).upper(),
                         "effect": str(e_atomic).strip(),
                         "effect_full": str(item.get("effect_full", e_atomic)).strip()
-                    })
-
-        except json.JSONDecodeError as e:
-            # Se fallisce, stampiamo solo l'inizio per debug
-            print(f"JSON Decode Error: {e} | Preview: {clean_json}...")
-        except Exception as e:
-            print(f"General parsing error: {e}")
+              })
 
         return relations
 
@@ -293,8 +301,8 @@ class CausalRAG:
         f"{self.graph.number_of_edges()} edges")
 
 #-------------------------------------------------------------------------------------#
-#-------------------------------LOAD/STORE -------------------------------------------#
-    
+#-------------------------------LOAD/STORE -------------------------------------------
+
     def save_causal_rag(self, topic_id, folder="causal_data"):
         """Salva l'intero stato del CausalRAG"""
         topic_folder = os.path.join(folder, f"topic_{topic_id}")
@@ -302,11 +310,11 @@ class CausalRAG:
             os.makedirs(topic_folder)
 
         # 1. Salva il Grafo NetworkX
-        with open(os.path.join(topic_folder, "graph.pkl"), "wb") as f:
+        with open(os.path.join(topic_folder, "graph.pkl"), "rb") as f:
             pickle.dump(self.graph, f)
 
         # 2. Salva la Mappa node_to_content
-        with open(os.path.join(topic_folder, "node_map.pkl"), "wb") as f:
+        with open(os.path.join(topic_folder, "node_map.pkl"), "rb") as f:
             pickle.dump(self.node_to_content, f)
 
         # 3. Salva il Vector Store (FAISS)
@@ -355,7 +363,7 @@ class CausalRAG:
             # Sincronizziamo il parametro k (opzionale ma consigliato)
             self.bm25_retriever.k = self.k * 2
 
-        self.node_list = list(self.graph.nodes())    
+        self.node_list = list(self.graph.nodes())
         print(f"✓ Oggetto Ricostruito: {len(self.node_list)} nodi. BM25Retriever pronto.")
 
 #-------------------------------------------------------------------------------------#
@@ -452,7 +460,7 @@ class CausalRAG:
 
         return expanded
     #------------------------------------------------------------------------------#
-    #-------------------------APPROCCIO CERCARE PERCORSI CAUSALI-------------------#
+    #-------------------------APPROCCIO CERCARE PERCORSI CAUSALI-------------------
 
     # INTERO PROCESSO DI SELEZIONE DEI NODI E DI RILEVAMENTO DI PERCORSI CAUSALI DA NODI CAUSA A NODI EFFETTO
     def find_all_causal_paths(self, relevant_nodes, cause_ids, effect_ids) -> Tuple[bool, List[List[str]]]:
@@ -589,7 +597,7 @@ class CausalRAG:
             "has_path": has_path,
             "context":context
             }
-    
+
     #-----------------------------------------------------------------------------#
     #-----------------APPROCCIO PERCORSI PARZIALI (MIGLIORE)----------------------#
 
@@ -651,9 +659,9 @@ class CausalRAG:
             summary = "No direct path or relevant context found."
         else:
             summary = "Partial causal chains"+"\n\n".join(summary_parts)
-        
+
         return summary
-    
+
     #-----------------------------------------------------------------------------#
     #---------------------------------SYNTHESIZER---------------------------------#
     # analizzare i percorsi causali estratti e sintetizzarli in un testo narrativo coerente, con sfumature che il Verifier può interpretare per inferire la risposta finale.
@@ -708,7 +716,7 @@ class CausalRAG:
 
 
     #------------------------------------------------------------------------------#
-    #-------------------------GRAFO PULIZIA E VISUALIZZAZIONE-----------------------#
+    #-------------------------GRAFO PULIZIA E VISUALIZZAZIONE-----------------------
 
     def visualize(self):
         """Disegna il grafo della causalità."""
@@ -779,7 +787,7 @@ class CausalRAG:
 
         # 3. Parsing del JSON (rimozione di eventuale markdown ```json ... ```)
         try:
-            json_str = re.search(r'\[.*\]', raw_response, re.DOTALL).group()
+            json_str = re.search(r'\[.*\|', raw_response, re.DOTALL).group()
             fused_results = json.loads(json_str)
         except Exception as e:
             print(f"Errore nel parsing JSON di Qwen: {e}")
@@ -881,19 +889,21 @@ class CausalRAG:
         print(f"✓ Sincronizzazione completata.")
         print(f"✓ Nodi finali nel grafo: {len(self.graph.nodes)}")
         print(f"✓ Nodi finali nel DB: {len(new_texts)}")
-  
+
 
 
 # ============================================================================
 # UTILIZZO PER SEMEVAL
 # ============================================================================
 
-
-def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, type_search="partial_paths") -> str:
+def generate_causal_summary(causal_rag: CausalRAG_local,  cause, effect, type_search="partial_paths") -> str:
     """
     Genera un sommario causale di causa ed effetto utilizzando CausalRAG.
     """
     context = ""
+    # Initialize result outside the if condition
+    result = {'has_path': False, 'context': ''}
+
     if type_search=="full_paths":
         # Verifica causalità
         result = causal_rag.is_causal_relation(
@@ -901,14 +911,16 @@ def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, type_search="
                 effect=effect
             )
         context = result['context']
-        
+
+    # This condition should use `type_search` directly or ensure `result` is always defined.
+    # Modified to ensure context is always populated if `type_search` is 'partial_paths' or if full_paths did not find a path.
     if type_search=="partial_paths" or result['has_path']==False:
-        
+
         context = causal_rag.find_partial_causal_paths(
                 cause=cause,
                 effect=effect
             )
-    
+
     context= causal_rag.generate_text_summary_from_causal_chain(
             raw_context=context,
             candidate_cause=cause,
