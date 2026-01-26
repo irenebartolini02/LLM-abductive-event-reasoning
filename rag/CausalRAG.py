@@ -23,7 +23,7 @@ from rank_bm25 import BM25Okapi
 from difflib import SequenceMatcher
 
 
-class CausalRAG_local:
+class CausalRAG:
     def __init__(self, model, tokenizer, k=3, s=3):
         """
         Args:
@@ -154,59 +154,52 @@ class CausalRAG_local:
         if not response or not isinstance(response, str):
             return relations
 
-        # 1. Pulizia e ricerca del blocco JSON
-        # Cerchiamo il match più ampio possibile tra parentesi quadre
-        match = re.search(r'\[\s*\{.*\}\s*\]', response, re.DOTALL)
+        # --- PULIZIA PRE-PARSING ---
+        # 1. Rimuoviamo i wrapper LaTeX \( \) che Qwen inserisce spesso
+        clean_content = response.replace(r'\(', '(').replace(r'\)', ')')
+        
+        # 2. Rimuoviamo i backslash illegali (quelli non seguiti da virgolette)
+        # Questo corregge l'errore char 119/168/240
+        clean_content = re.sub(r'\\(?!["])', '', clean_content)
+
+        # 3. Ricerca del blocco JSON
+        match = re.search(r'\[\s*\{.*\}\s*\]', clean_content, re.DOTALL)
 
         if match:
             clean_json = match.group(0)
         else:
-            # Se non c'è una lista, cerchiamo un oggetto singolo
-            match_single = re.search(r'\{.*\}', response, re.DOTALL)
+            match_single = re.search(r'\{.*\}', clean_content, re.DOTALL)
             if match_single:
                 clean_json = "[" + match_single.group(0) + "]"
             else:
-                # Se l'LLM ha risposto "No relations found"
                 return []
 
-        # 2. Parsing (fuori dai blocchi if/else precedenti)
         try:
-
-            data = json.loads(clean_json)
-
+            # strict=False è vitale per ignorare newline o tab non scappati
+            data = json.loads(clean_json, strict=False)
         except json.JSONDecodeError as e:
-            # Se fallisce, stampiamo solo l'inizio per debug
+            # Fallback estremo: togliamo TUTTI i backslash residui
             try:
-              radical_clean = match_single.group(0).replace('\\', '') # Changed json_match to match_single
-              data = json.loads(radical_clean, strict=False)
+                data = json.loads(clean_json.replace('\\', ''), strict=False)
             except:
-              print(f"Errore fatale: {e}")
-              print(f"JSON Decode Error: {e} | Preview: {clean_json}...")
-              data=[]
-        except Exception as e:
-            print(f"General parsing error: {e}")
-            data=[]
-
-        if isinstance(data, dict):
-              data = [data]
-
+                print(f"Errore fatale persistente: {e} | Preview: {clean_json[:100]}")
+                data = []
+        
+        # ... resto del filtraggio delle chiavi ...
+        if isinstance(data, dict): data = [data]
         for item in data:
-              # Controllo robusto delle chiavi (usiamo i nomi estratti dal tuo prompt)
-              c_atomic = item.get("cause_atomic")
-              rel = item.get("relation")
-              e_atomic = item.get("effect_atomic")
-
-              if c_atomic and rel and e_atomic:
-                    relations.append({
-                        "cause": str(c_atomic).strip(),
-                        "cause_full": str(item.get("cause_full", c_atomic)).strip(),
-                        "relation": str(rel).upper(),
-                        "effect": str(e_atomic).strip(),
-                        "effect_full": str(item.get("effect_full", e_atomic)).strip()
-              })
-
+            c_atomic = item.get("cause_atomic")
+            rel = item.get("relation")
+            e_atomic = item.get("effect_atomic")
+            if c_atomic and rel and e_atomic:
+                relations.append({
+                    "cause": str(c_atomic).strip(),
+                    "cause_full": str(item.get("cause_full", c_atomic)).strip(),
+                    "relation": str(rel).upper(),
+                    "effect": str(e_atomic).strip(),
+                    "effect_full": str(item.get("effect_full", e_atomic)).strip()
+                })
         return relations
-
 
 
     # DATI TUTTI I CHUNKS RELATIVI AD UN TOPIC ID GENERA e POPOLA IL GRAFO
@@ -310,11 +303,11 @@ class CausalRAG_local:
             os.makedirs(topic_folder)
 
         # 1. Salva il Grafo NetworkX
-        with open(os.path.join(topic_folder, "graph.pkl"), "rb") as f:
+        with open(os.path.join(topic_folder, "graph.pkl"), "wb") as f:
             pickle.dump(self.graph, f)
 
         # 2. Salva la Mappa node_to_content
-        with open(os.path.join(topic_folder, "node_map.pkl"), "rb") as f:
+        with open(os.path.join(topic_folder, "node_map.pkl"), "wb") as f:
             pickle.dump(self.node_to_content, f)
 
         # 3. Salva il Vector Store (FAISS)
