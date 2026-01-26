@@ -889,7 +889,7 @@ class CausalRAG:
 # UTILIZZO PER SEMEVAL
 # ============================================================================
 
-def generate_causal_summary(causal_rag: CausalRAG_local,  cause, effect, type_search="partial_paths") -> str:
+def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, type_search="partial_paths") -> str:
     """
     Genera un sommario causale di causa ed effetto utilizzando CausalRAG.
     """
