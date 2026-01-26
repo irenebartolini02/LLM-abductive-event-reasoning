@@ -75,7 +75,13 @@ class CausalRAG:
           - If the text says "A happened, and then B occurred", evaluate if A influenced B and extract it.
           - Look for trigger words: "led to", "influenced", "resulted in", "after which", "following", "response to".
           - Don't be afraid to extract multiple small steps.
-          - If you find NO relations, output exactly: [] (nothing else)."""
+          - If you find NO relations, output exactly: [] (nothing else).
+          
+          Format your output as a VALID JSON LIST. 
+          STRICT RULES for JSON:
+            - Do not use backslashes (\) for escaping unless absolutely necessary for JSON syntax.
+            - Ensure all quotes are standard double quotes (").
+            - Output ONLY the raw JSON list, no preamble, no markdown code blocks, no explanation."""
 
 
         user_content = f"""Extract ALL causal relations from the text below.
