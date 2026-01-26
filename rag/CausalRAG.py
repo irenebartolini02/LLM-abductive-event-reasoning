@@ -111,7 +111,7 @@ class CausalRAG:
             with torch.no_grad():
               outputs = self.llm.pipeline.model.generate(
               **inputs,
-              max_new_tokens=4000,
+              max_new_tokens=10000,
               do_sample=False,      # Determinism
               temperature=0.0,
               pad_token_id=self.llm.pipeline.tokenizer.eos_token_id
