@@ -76,12 +76,8 @@ class CausalRAG:
           - Look for trigger words: "led to", "influenced", "resulted in", "after which", "following", "response to".
           - Don't be afraid to extract multiple small steps.
           - If you find NO relations, output exactly: [] (nothing else).
-          
-          Format your output as a VALID JSON LIST. 
-          STRICT RULES for JSON:
-            - Do not use backslashes (\) for escaping unless absolutely necessary for JSON syntax.
-            - Ensure all quotes are standard double quotes (").
-            - Output ONLY the raw JSON list, no preamble, no markdown code blocks, no explanation."""
+
+            """
 
 
         user_content = f"""Extract ALL causal relations from the text below.
@@ -89,6 +85,12 @@ class CausalRAG:
           1. NO MISSING LINKS: If a chain of events exists, extract every link.
           2. CONSISTENT NAMING: Use the same 'cause_atomic' name if the event repeats in the text.
           3. GRANULARITY: Extract at least 3-5 relations per paragraph if present.
+                    
+          Format your output as a VALID JSON LIST. 
+          STRICT RULES for JSON:
+            - Do not use backslashes (\) for escaping unless absolutely necessary for JSON syntax.
+            - Ensure all quotes are standard double quotes (").
+            - Output ONLY the raw JSON list, no preamble, no markdown code blocks, no explanation.
 
           FORMAT EXAMPLE:
           Text: "The heavy rain led to a flood which then caused the bridge to collapse."
