@@ -193,7 +193,7 @@ class CausalRAG:
 
         except json.JSONDecodeError as e:
             # Se fallisce, stampiamo solo l'inizio per debug
-            print(f"JSON Decode Error: {e} | Preview: {clean_json[:50]}...")
+            print(f"JSON Decode Error: {e} | Preview: {clean_json}...")
         except Exception as e:
             print(f"General parsing error: {e}")
 
