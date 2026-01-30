@@ -173,11 +173,11 @@ def reasoner_prompt(tokenizer, context,question):
 
 def reasoner_agent_parser(text):
     """
-    Parser ottimizzato per estrarre la risposta anche se preceduta da 'Option' 
-    o formattata in modo non standard.
+    Optimized parser to extract the response even if preceded by 'Option' 
+    or formatted in a non-standard way.
     """
-    # 1. Cerchiamo la riga della Final Answer
-    # Supporta: "Final Answer: [C]", "Final Answer: Option C", "Final Answer: C"
+    # 1. Look for the Final Answer line
+    # Supports: "Final Answer: [C]", "Final Answer: Option C", "Final Answer: C"
     answer_match = re.search(r'Final\s*Answer\s*:?\s*(.*)', text, re.IGNORECASE)
     
     answer = []
@@ -185,14 +185,14 @@ def reasoner_agent_parser(text):
 
     if answer_match:
         answer_line = answer_match.group(1).strip()
-        # 2. Estraiamo solo le lettere singole (A, B, C o D) isolate o in parentesi
-        # Questa regex cerca lettere singole maiuscole che non siano parte di altre parole
+        # 2. Extract only single isolated letters (A, B, C or D)
+        # This regex searches for single uppercase letters that are not part of other words
         letters = re.findall(r'\b([A-D])\b', answer_line.upper())
         
         if letters:
-            answer = sorted(list(set(letters))) # Rimuove duplicati e ordina
+            answer = sorted(list(set(letters))) # Remove duplicates and sort
         
-        # 3. Il reasoning è tutto ciò che precede la riga trovata
+        # 3. The reasoning is everything that comes before the found line
         reasoning = text[:answer_match.start()].strip()
 
     return {

@@ -9,9 +9,9 @@ def load_model( MODEL_NAME: str):
     """Load a Qwen model from the given model name."""
     # 1. Definition of the quantization
     bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,              # Active 4-bit loading
+        load_in_4bit=True,              # Activate 4-bit loading
         bnb_4bit_quant_type="nf4",      # Use the type "nf4" (more precise)
-        bnb_4bit_compute_dtype=torch.float16  # loat16
+        bnb_4bit_compute_dtype=torch.float16  # float16
     )
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -33,14 +33,14 @@ def load_model( MODEL_NAME: str):
 
 
 def format_qwen_prompt(tokenizer, SYSTEM_PROMPT, question, context_text , max_total_chars=20_000):
-  #1 Obtain the context
+  #1 Get the context
   if len(context_text) < max_total_chars:
     context_text = context_text[:max_total_chars]+ " ..."
 
   # 2. Prompt Composition
   system_content =SYSTEM_PROMPT
 
-  # Messaggio utente pulito
+  # Cleaned user message
   user_content = f"""Event: "{question['target_event']}"
 
 Context Documents:
@@ -54,7 +54,7 @@ D) {question['option_D']}
 
 Answer (letters only):"""
 
- # template ufficiale Qwen con i ruoli distinti
+ # Official Qwen template with distinct roles
   messages = [
         {"role": "system", "content": system_content},
         {"role": "user", "content": user_content}

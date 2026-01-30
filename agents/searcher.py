@@ -103,13 +103,13 @@ def search_prompt(tokenizer, context, question):
     return prompt
 
 def search_agent_parser(response_raw: str) -> Dict:
-    # 1. Estrazione dei blocchi principali con Regex (più flessibili sui ritorni a capo)
+    # 1. Extract main blocks with Regex (more flexible on line breaks)
     discarded_match = re.search(r"Discarded options:\s*(.*)", response_raw, re.IGNORECASE)
     proposal_match = re.search(r"Proposal options:\s*(.*)", response_raw, re.IGNORECASE)
-    # Il reasoning si ferma quando incontra Action: o la fine del testo
+    # The reasoning stops when it encounters Action: or the end of the text
     reasoning_match = re.search(r"Reasoning:\s*(.*?)(?=Action:|$)", response_raw, re.IGNORECASE | re.DOTALL)
     action_match = re.search(r"Action:\s*(\w+)", response_raw, re.IGNORECASE)
-    # Cattura tutto ciò che segue "Queries:" fino alla fine o al blocco successivo
+    # Captures everything that follows "Queries:" until the end or the next block
     query_block_match = re.search(r"Queries:\s*(.*)", response_raw, re.IGNORECASE | re.DOTALL)
 
     data = {
@@ -120,18 +120,18 @@ def search_agent_parser(response_raw: str) -> Dict:
         "queries": []
     }
 
-    # 2. Parsing Lettere (A-D)
+    # 2. Parse Letters (A-D)
     if discarded_match:
         data["discarded"] = re.findall(r'[A-D]', discarded_match.group(1).upper())
     
     if proposal_match:
         data["proposal"] = re.findall(r'[A-D]', proposal_match.group(1).upper())
 
-    # 3. Parsing Reasoning
+    # 3. Parse Reasoning
     if reasoning_match:
         data["reasoning"] = reasoning_match.group(1).strip()
 
-    # 4. Parsing Action
+    # 4. Parse Action
     if action_match:
         action_val = action_match.group(1).upper()
         data["is_sufficient"] = "SEARCH" not in action_val

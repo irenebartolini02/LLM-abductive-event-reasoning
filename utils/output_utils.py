@@ -11,11 +11,11 @@ def clean_response(response_text):
     # Find all uppercase letters A-D in the text
     matches = re.findall(r'\b[A-D]\b', response_text.upper())
 
-    # If does not find anything, return empty string
+    # If nothing is found, return empty string
     if not matches:
         return set()
 
-    # Return set for easy comparision (the order does not count for sets)
+    # Return set for easy comparison (the order does not matter for sets)
     return set(matches)
 
 
@@ -40,11 +40,11 @@ def calculate_score(prediction_set, golden_string):
 
     # Case 2: Golden Answer CONTAIN the prediction -> 0.5 points
     # Example: Gold={A, B}, Pred={A} -> Gold contains Pred
-    # Esempio: Gold={A}, Pred={A, B} -> Gold DOES NOT contain Pred
+    # Example: Gold={A}, Pred={A, B} -> Gold DOES NOT contain Pred
     elif prediction_set.issubset(golden_set):
         return 0.5
 
-    # Case 3: Golden does not contain predicted (Wrong) -> 0 punti
+    # Case 3: Golden does not contain predicted (Wrong) -> 0 points
     else:
         return 0.0
     

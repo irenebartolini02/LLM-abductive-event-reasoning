@@ -56,7 +56,7 @@ class CausalRAG:
 
 #-------------------------------CREATE CAUSAL RAG---------------------------------------#
 
-    # RICHIESTA A QWEN PER ESTRARRE IL GRAFO
+    # REQUEST QWEN TO EXTRACT THE GRAPH
     def extract_causal_graph_manual(self, text: str) -> List[Tuple[str, str, str]]:
         """
         Extract causal relationships using Qwen with explicit chat roles.
@@ -108,7 +108,7 @@ class CausalRAG:
         ]
 
         try:
-            # Usa il chat template ufficiale Qwen
+            # Use official Qwen chat template
             prompt = self.llm.pipeline.tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
@@ -175,14 +175,14 @@ class CausalRAG:
                 return []
 
         try:
-            # strict=False è vitale per ignorare newline o tab non scappati
+            # strict=False is vital to ignore unescaped newlines or tabs
             data = json.loads(clean_json, strict=False)
         except json.JSONDecodeError as e:
-            # Fallback estremo: togliamo TUTTI i backslash residui
+            # Extreme fallback: remove ALL residual backslashes
             try:
                 data = json.loads(clean_json.replace('\\', ''), strict=False)
             except:
-                print(f"Errore fatale persistente: {e} | Preview: {clean_json[:100]}")
+                print(f"Fatal persistent error: {e} | Preview: {clean_json[:100]}")
                 data = []
         
         # ... resto del filtraggio delle chiavi ...
@@ -202,7 +202,7 @@ class CausalRAG:
         return relations
 
 
-    # DATI TUTTI I CHUNKS RELATIVI AD UN TOPIC ID GENERA e POPOLA IL GRAFO
+    # GIVEN ALL CHUNKS RELATED TO A TOPIC ID, GENERATE AND POPULATE THE GRAPH
     def index_documents(self, chunks: List[str]):
         """Manual extraction using Qwen """
 
@@ -217,11 +217,11 @@ class CausalRAG:
                 relations = self.extract_causal_graph_manual(chunk.page_content)
 
                 for rel in relations:
-                    # Trasformiamo l'atomic name in un ID standardizzato
+                    # Transform the atomic name into a standardized ID
                     c_id = rel["cause"].lower().strip().replace(".", "")
                     e_id = rel["effect"].lower().strip().replace(".", "")
 
-                    # Iteriamo su causa ed effetto per registrarli nel grafo
+                    # Iterate over cause and effect to register them in the graph
                     nodes_to_process = [
                         (c_id, rel["cause_full"]),
                         (e_id, rel["effect_full"])
@@ -229,24 +229,24 @@ class CausalRAG:
 
                     for nid, full_text in nodes_to_process:
                         if nid not in self.graph:
-                            # NODO NUOVO:
+                            # NEW NODE:
                             self.graph.add_node(nid)
                             self.node_to_content[nid] = full_text
 
                         else:
-                          # NODO GIA' PRESENTE
+                          # NODE ALREADY PRESENT
                             existing_content = self.node_to_content.get(nid, "")
                             if full_text not in existing_content:
-                              # Aggiungiamo il nuovo dettaglio separato da ","
+                              # Add the new detail separated by comma
                               self.node_to_content[nid] = existing_content + "," + full_text
 
 
-                    # Aggiunta dell'Arco (Relazione)
+                    # Add the Edge (Relation)
                     self.graph.add_edge(
                         c_id,
                         e_id,
                         relation=rel["relation"],
-                        # Opzionale: salviamo anche qui i testi originali per debug
+                        # Optional: save original texts here for debugging
                         cause_text=self.node_to_content[c_id],
                         effect_text=self.node_to_content[e_id],
                         )
@@ -286,7 +286,7 @@ class CausalRAG:
             for nid, content in zip(node_ids, all_contents)
         ]
         self.bm25_retriever = BM25Retriever.from_documents(documents)
-        # necessario preimpostare il numero di documenti da recuperare:
+        # It is necessary to preset the number of documents to retrieve:
         self.bm25_retriever.k = self.k * 2
         self.node_list = list(self.graph.nodes())
 
@@ -297,43 +297,43 @@ class CausalRAG:
 #-------------------------------LOAD/STORE -------------------------------------------
 
     def save_causal_rag(self, topic_id, folder="causal_data"):
-        """Salva l'intero stato del CausalRAG"""
+        """Save the entire state of CausalRAG"""
         topic_folder = os.path.join(folder, f"topic_{topic_id}")
         if not os.path.exists(topic_folder):
             os.makedirs(topic_folder)
 
-        # 1. Salva il Grafo NetworkX
+        # 1. Save the NetworkX Graph
         with open(os.path.join(topic_folder, "graph.pkl"), "wb") as f:
             pickle.dump(self.graph, f)
 
-        # 2. Salva la Mappa node_to_content
+        # 2. Save the node_to_content Map
         with open(os.path.join(topic_folder, "node_map.pkl"), "wb") as f:
             pickle.dump(self.node_to_content, f)
 
-        # 3. Salva il Vector Store (FAISS)
+        # 3. Save the Vector Store (FAISS)
         if self.vector_store:
             self.vector_store.save_local(os.path.join(topic_folder, "faiss_index"))
 
-        print(f"✓ Dati salvati correttamente per il topic {topic_id}")
+        print(f"✓ Data saved correctly for topic {topic_id}")
 
-    # RICARICA IL CAUSAL RAG DA DISCO
+    # RELOAD THE CAUSAL RAG FROM DISK
     def load_causal_rag(self, topic_id, folder="causal_data"):
         """
-        Ricarica i dati e ricostruisce il BM25Retriever basandosi sui nodi salvati
+        Reload the data and rebuild the BM25Retriever based on the saved nodes
         """
         topic_folder = os.path.join(folder, f"topic_{topic_id}")
         if not os.path.exists(topic_folder):
-            raise FileNotFoundError(f"Cartella non trovata: {topic_folder}")
+            raise FileNotFoundError(f"Folder not found: {topic_folder}")
 
-        # 1. Carica il Grafo
+        # 1. Load the Graph
         with open(os.path.join(topic_folder, "graph.pkl"), "rb") as f:
             self.graph = pickle.load(f)
 
-        # 2. Carica la Mappa node_to_content
+        # 2. Load the node_to_content Map
         with open(os.path.join(topic_folder, "node_map.pkl"), "rb") as f:
             self.node_to_content = pickle.load(f)
 
-        # 3. Carica il Vector Store (FAISS)
+        # 3. Load the Vector Store (FAISS)
         vs_path = os.path.join(topic_folder, "faiss_index")
         self.vector_store = FAISS.load_local(
             vs_path,
@@ -341,8 +341,8 @@ class CausalRAG:
             allow_dangerous_deserialization=True
         )
 
-        # --- RICOSTRUZIONE BM25RETRIEVER ---
-        # 4. Creiamo la lista di Documenti partendo dalla node_map caricata
+        # --- RECONSTRUCTION BM25RETRIEVER ---
+        # 4. Create the list of Documents starting from the loaded node_map
         documents = []
         for nid, content in self.node_to_content.items():
             documents.append(Document(
@@ -351,37 +351,37 @@ class CausalRAG:
             ))
 
         if documents:
-            # Inizializziamo il retriever con i documenti ricostruiti
+            # Initialize the retriever with the reconstructed documents
             self.bm25_retriever = BM25Retriever.from_documents(documents)
-            # Sincronizziamo il parametro k (opzionale ma consigliato)
+            # Synchronize the k parameter (optional but recommended)
             self.bm25_retriever.k = self.k * 2
 
         self.node_list = list(self.graph.nodes())
-        print(f"✓ Oggetto Ricostruito: {len(self.node_list)} nodi. BM25Retriever pronto.")
+        print(f"✓ Object Reconstructed: {len(self.node_list)} nodes. BM25Retriever ready.")
 
 #-------------------------------------------------------------------------------------#
-#----------------INDIVIDUARE NODI E CORRELAZIONI CAUSALI RILEVANTI--------------------#
+#----------------IDENTIFY NODES AND RELEVANT CAUSAL CORRELATIONS--------------------#
 
-    # SCEGLIERE I NODI DI PARTENZA  PIù AFFINI
+    # CHOOSE THE MOST RELATED STARTING NODES
     def retrieve_relevant_nodes(self, query: str) -> List[str]:
       """
-      Hybrid Search utilizzando la Reciprocal Rank Fusion (RRF)
+      Hybrid Search using Reciprocal Rank Fusion (RRF)
       """
       if not self.bm25_retriever or not self.vector_store:
           return []
 
-      # 1. Ottieni i ranking da BM25
+      # 1. Get the rankings from BM25
       result_docs = self.bm25_retriever.get_relevant_documents(query)
       bm25_results = [doc.metadata['node_id'] for doc in result_docs]
 
-      # 2. Ottieni i ranking da FAISS
+      # 2. Get the rankings from FAISS
       semantic_results = self.vector_store.similarity_search_with_score(query, k=self.k *2)
       faiss_results = [doc.metadata['node_id'] for doc, score in semantic_results]
 
       # 3. Reciprocal Rank Fusion (RRF)
-      # Calcola un punteggio combinato: più un nodo è in alto in entrambe le liste, meglio è.
+      # Calculate a combined score: the more a node is high in both lists, the better.
       rrf_scores = {}
-      k_constant = 60 # Valore standard per RRF per bilanciare i rank
+      k_constant = 60 # Standard value for RRF to balance ranks
 
       for rank, node_id in enumerate(bm25_results):
           rrf_scores[node_id] = rrf_scores.get(node_id, 0) + 1.0 / (k_constant + rank)
@@ -389,17 +389,17 @@ class CausalRAG:
       for rank, node_id in enumerate(faiss_results):
           rrf_scores[node_id] = rrf_scores.get(node_id, 0) + 1.0 / (k_constant + rank)
 
-      # 4. Ordina i nodi in base allo score RRF finale
+      # 4. Sort the nodes based on the final RRF score
       sorted_nodes = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
 
-      # Debug: vedi quali nodi hanno fatto "match" in entrambi
+      # Debug: see which nodes matched in both
       #combined_hits = [node for node in bm25_results if node in faiss_results]
       return [node for node, score in sorted_nodes[:self.k]]
 
-    # PARTENDO DAI NODI INIZIALI ESPANDARE IL SOTTOGRAFO SEGUENDO GLI ARCHI
+    # STARTING FROM THE INITIAL NODES, EXPAND THE SUBGRAPH FOLLOWING THE EDGES
     def expand_nodes(self, initial_nodes: List[str]) -> Set[str]:
         """
-        Espande i nodi per s passi (Breadth-First Search)
+        Expands the nodes for s steps (Breadth-First Search)
         """
         expanded = set(initial_nodes)
         current_layer = set(initial_nodes)
@@ -408,9 +408,9 @@ class CausalRAG:
             next_layer = set()
             for node in current_layer:
                 if node in self.graph:
-                    # Prende vicini entranti e uscenti
+                    # Take incoming and outgoing neighbors
                     neighbors = set(self.graph.predecessors(node)) | set(self.graph.successors(node))
-                    # Consideriamo solo i vicini che non abbiamo ancora esplorato
+                    # Consider only neighbors we haven't explored yet
                     new_neighbors = neighbors - expanded
                     next_layer.update(new_neighbors)
 
@@ -418,15 +418,15 @@ class CausalRAG:
                 break
 
             expanded.update(next_layer)
-            current_layer = next_layer # Il prossimo giro parte dai nodi appena trovati
+            current_layer = next_layer # Next iteration starts from the newly found nodes
 
         return expanded
 
-     # PARTENDO DAI NODI INIZIALI ESPANDARE IL SOTTOGRAFO SEGUENDO GLI ARCHI IN DIREZIONE PREDEFINITA
+     # STARTING FROM THE INITIAL NODES, EXPAND THE SUBGRAPH FOLLOWING THE EDGES IN A PREDEFINED DIRECTION
     def expand_directional(self, initial_nodes: List[str], direction: str) -> Set[str]:
         """
-        direction: 'forward' per le cause (successors),
-                'backward' per gli effetti (predecessors)
+        direction: 'forward' for causes (successors),
+                'backward' for effects (predecessors)
         """
         expanded = set(initial_nodes)
         current_layer = set(initial_nodes)
@@ -436,10 +436,10 @@ class CausalRAG:
             for node in current_layer:
                 if node in self.graph:
                     if direction == 'forward':
-                        # Seguiamo la freccia: cosa causa questo nodo?
+                        # Follow the arrow: what causes this node?
                         neighbors = set(self.graph.successors(node))
                     else:
-                        # Risaliamo la freccia: da cosa è causato questo nodo?
+                        # Trace back the arrow: what is this node caused by?
                         neighbors = set(self.graph.predecessors(node))
 
                     new_neighbors = neighbors - expanded
@@ -453,12 +453,12 @@ class CausalRAG:
 
         return expanded
     #------------------------------------------------------------------------------#
-    #-------------------------APPROCCIO CERCARE PERCORSI CAUSALI-------------------
+    #-------------------------APPROACH: SEARCH FOR CAUSAL PATHS-------------------
 
-    # INTERO PROCESSO DI SELEZIONE DEI NODI E DI RILEVAMENTO DI PERCORSI CAUSALI DA NODI CAUSA A NODI EFFETTO
+    # ENTIRE PROCESS OF NODE SELECTION AND DETECTION OF CAUSAL PATHS FROM CAUSE NODES TO EFFECT NODES
     def find_all_causal_paths(self, relevant_nodes, cause_ids, effect_ids) -> Tuple[bool, List[List[str]]]:
       """
-      Trova TUTTI i path causali tra nodi causa e nodi effetto
+      Find ALL causal paths between cause nodes and effect nodes
       Returns: (has_paths, list_of_paths)
       """
 
@@ -468,26 +468,26 @@ class CausalRAG:
       subgraph = self.graph.subgraph(relevant_nodes)
 
       # DEBUG
-      # 2. Prepariamo i colori dei nodi
+      # 2. Prepare node colors
       color_map = []
       for node in subgraph.nodes():
         if node in cause_ids:
-            color_map.append('red')       # Nodo Causa
+            color_map.append('red')       # Cause Node
         elif node in effect_ids:
-            color_map.append('green')     # Nodo Effetto
+            color_map.append('green')     # Effect Node
         else:
-            color_map.append('skyblue')   # Nodi intermedi (il percorso)
+            color_map.append('skyblue')   # Intermediate nodes (the path)
 
-        # 3. Visualizzazione
+        # 3. Visualization
       plt.figure(figsize=(12, 8))
-      # Aumentiamo k per distanziare meglio i nodi se sono molti
+      # Increase k to better space nodes if there are many
       pos = nx.spring_layout(subgraph, seed=42, k=1.5)
 
       nx.draw(
         subgraph,
         pos,
         with_labels=True,
-        node_color=color_map, # Usiamo la mappa dei colori creata
+        node_color=color_map, # Use the created color map
         node_size=2500,
         font_size=8,
         font_weight='bold',
@@ -497,7 +497,7 @@ class CausalRAG:
         alpha=0.9
       )
 
-      plt.title(f"Analisi Percorso: Rosso (Causa) -> Verde (Effetto)")
+      plt.title(f"Path Analysis: Red (Cause) -> Green (Effect)")
       plt.show()
 
 
@@ -506,60 +506,60 @@ class CausalRAG:
       for c_node in cause_ids:
           for e_node in effect_ids:
               if c_node == e_node:
-                  #nota se nodo causa è uguale a nodo effetto la relazione è auto-contenuta
+                  #note if cause node equals effect node, the relation is self-contained
                   all_paths.append([c_node])
                   continue
               try:
                   has_path= nx.has_path(subgraph, c_node, e_node)
                   if has_path:
-                      # Trova TUTTI i path semplici (senza cicli)
+                      # Find ALL simple paths (without cycles)
                       paths = list(nx.all_simple_paths(
                           subgraph,
                           c_node,
                           e_node,
-                          cutoff=self.s + 1  # Limita lunghezza
+                          cutoff=self.s + 1  # Limit length
                       ))
-                      # Filtra path validi
+                      # Filter valid paths
                       all_paths.extend(paths)
 
               except Exception as e:
-                  print(f"Errore: {e}")
+                  print(f"Error: {e}")
                   continue
 
-      # Ordina per qualità (path più corti = più forti causalmente)
+      # Sort by quality (shorter paths = stronger causally)
       all_paths.sort(key=len)
 
       return len(all_paths) > 0, all_paths[:self.k]
 
-    # PIPELINE COMPLETA PER VERIFICARE SE CAUSA → EFFETTO
+    # COMPLETE PIPELINE TO VERIFY IF CAUSE → EFFECT
     def is_causal_relation(self, cause: str, effect: str) -> Dict:
         """
-        Pipeline completa per verificare se causa → effetto
+        Complete pipeline to verify if cause → effect
         """
-        # Step 1: Recupera nodi rilevanti per entrambi gli eventi
+        # Step 1: Retrieve relevant nodes for both events
         cause_ids = self.retrieve_relevant_nodes(cause)
         effect_ids = self.retrieve_relevant_nodes(effect)
         print(f"cause nodes: {len(cause_ids)}, effect nodes {len(effect_ids)} ")
 
-        # Step 2: Espandi i nodi
+        # Step 2: Expand the nodes
         expanded_cause = self.expand_directional(cause_ids, "forward")
         expanded_effect = self.expand_directional(effect_ids, "backward")
 
         # debug
         print(f"expanded cause nodes: {len(expanded_cause)}, expanded effect nodes {len(expanded_effect)} ")
 
-        # Unisci i sottografi
+        # Merge the subgraphs
         relevant_nodes = expanded_cause.union(expanded_effect).union(set(cause_ids)).union(set(effect_ids))
 
-        # Step 3: Cerca percorso causale
+        # Step 3: Search for causal path
         has_path, all_found_paths = self.find_all_causal_paths(relevant_nodes, cause_ids, effect_ids)
 
-        # Step 4: Costruisci contesto per LLM
+        # Step 4: Build context for LLM
         context_parts = []
         context = ""
 
         if has_path:
-            # Aggiungi relazioni del percorso per tutti i path trovati
+            # Add path relations for all found paths
             for path_segment in all_found_paths: # Iterate through each individual path
                 if len(path_segment)==1:
                   context_parts.append(f"\n- {path_segment[0]}")
@@ -592,24 +592,24 @@ class CausalRAG:
             }
 
     #-----------------------------------------------------------------------------#
-    #-----------------APPROCCIO PERCORSI PARZIALI (MIGLIORE)----------------------#
+    #-----------------APPROACH: PARTIAL PATHS (BETTER)----------------------#
 
     def find_partial_causal_paths(self, cause, effect) -> str:
-        # 1. Recupero nodi rilevanti per entrambi i poli (Causa ed Effetto)
+        # 1. Retrieve relevant nodes for both poles (Cause and Effect)
         cause_ids = self.retrieve_relevant_nodes(cause)
         effect_ids = self.retrieve_relevant_nodes(effect)
 
-        # 2. Espansione bidirezionale
-        # Espandiamo in AVANTI dalla causa (cosa provoca la causa?)
+        # 2. Bidirectional expansion
+        # Expand FORWARD from the cause (what causes the cause?)
         cause_extended = self.expand_directional(cause_ids, "forward")
-        # Espandiamo all'INDIETRO dall'effetto (da cosa è causato l'effetto?)
+        # Expand BACKWARD from the effect (what is the effect caused by?)
         effect_extended = self.expand_directional(effect_ids, "backward")
 
-        # Unione dei nodi per creare un sottografo di contesto
+        # Union of nodes to create a context subgraph
         all_relevant_ids = set(cause_extended) | set(effect_extended)
         subgraph = self.graph.subgraph(all_relevant_ids)
 
-        # 3. Serializzazione Archi (Relazioni)
+        # 3. Edge Serialization (Relations)
         relations = []
         nodes_with_edges = set()
 
@@ -621,7 +621,7 @@ class CausalRAG:
 
             nodes_with_edges.update([u, v])
 
-        # 4. Recupero Nodi "Orfani" o Specifici (Dettagli aggiuntivi su causa ed effetto)
+        # 4. Retrieve "Orphan" or Specific Nodes (Additional context on cause and effect)
         cause_context = []
         effect_context = []
 
@@ -636,7 +636,7 @@ class CausalRAG:
                 node_text = self.graph.nodes[node_id].get('text', node_id)
                 effect_context.append(f"- Target detail: {node_text}")
 
-        # 5. Composizione del Summary
+        # 5. Summary Composition
         summary_parts = []
 
         if relations:
@@ -657,11 +657,11 @@ class CausalRAG:
 
     #-----------------------------------------------------------------------------#
     #---------------------------------SYNTHESIZER---------------------------------#
-    # analizzare i percorsi causali estratti e sintetizzarli in un testo narrativo coerente, con sfumature che il Verifier può interpretare per inferire la risposta finale.
+    # Analyze the extracted causal paths and synthesize them into a coherent narrative text, with nuances that the Verifier can interpret to infer the final answer.
     def generate_text_summary_from_causal_chain(self, raw_context, candidate_cause, target_event):
         """
-        Sintetizza le catene grezze in un testo narrativo che evidenzia l'intensità
-        e la natura dei legami causali senza inventare connessioni.
+        Synthesizes raw chains into a narrative text that highlights the intensity
+        and nature of causal links without inventing connections.
         """
 
         system_content = f"""You are a Causal Chain Synthesizer.
@@ -689,7 +689,7 @@ class CausalRAG:
             {"role": "user", "content": user_content}
         ]
 
-        # Utilizziamo l'apply_chat_template per coerenza con il modello Qwen/Llama
+        # Use apply_chat_template for consistency with the Qwen/Llama model
         prompt = self.llm.pipeline.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
         inputs = self.llm.pipeline.tokenizer(prompt, return_tensors="pt").to(self.llm.pipeline.model.device)
@@ -701,7 +701,7 @@ class CausalRAG:
         )
 
         summary = self.llm.pipeline.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        # Estrazione pulita della risposta dell'assistente
+        # Clean extraction of the assistant's response
         if "assistant\n" in summary:
             summary = summary.split("assistant\n")[-1].strip()
 
@@ -709,12 +709,12 @@ class CausalRAG:
 
 
     #------------------------------------------------------------------------------#
-    #-------------------------GRAFO PULIZIA E VISUALIZZAZIONE-----------------------
+    #-------------------------GRAPH CLEANUP AND VISUALIZATION-----------------------
 
     def visualize(self):
-        """Disegna il grafo della causalità."""
+        """Draw the causality graph."""
         plt.figure(figsize=(10, 6))
-        pos = nx.spring_layout(self.graph, seed=42, k=2) # Layout elastico
+        pos = nx.spring_layout(self.graph, seed=42, k=2) # Elastic layout
         nx.draw(self.graph, pos, with_labels=True, node_color='skyblue',
                 node_size=2000, font_size=9, font_weight='bold', arrows=True, arrowsize=20)
         plt.title("Grafo degli Eventi Causali")
@@ -723,16 +723,16 @@ class CausalRAG:
 
     def merge_similare_nodes(self, possible_node_to_fuse_ids):
         """
-        Chiede a Qwen di valutare la fusione di nodi simili e aggiorna la struttura del grafo.
+        Asks Qwen to evaluate the merging of similar nodes and updates the graph structure.
         """
         if not possible_node_to_fuse_ids:
             return
 
-        # 1. Ricostruzione dati per il prompt
+        # 1. Data reconstruction for the prompt
         nodes_data = []
         for nid in possible_node_to_fuse_ids:
             content = self.node_to_content.get(nid, {})
-            # Gestione flessibile se content è stringa o dict
+            # Flexible handling if content is string or dict
             details = content.get('text', str(content)) if isinstance(content, dict) else str(content)
             nodes_data.append({
                 "EVENT_TITLE": nid,
@@ -763,7 +763,7 @@ class CausalRAG:
             {"role": "user", "content": user_content},
         ]
 
-        # 2. Generazione con Qwen
+        # 2. Generation with Qwen
         prompt = self.llm.pipeline.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self.llm.pipeline.tokenizer(prompt, return_tensors="pt").to(self.llm.pipeline.model.device)
 
@@ -778,15 +778,15 @@ class CausalRAG:
         generated_ids = outputs[0][inputs.input_ids.shape[1]:]
         raw_response = self.llm.pipeline.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
 
-        # 3. Parsing del JSON (rimozione di eventuale markdown ```json ... ```)
+        # 3. JSON parsing (remove eventual markdown ```json ... ```)
         try:
             json_str = re.search(r'\[.*\|', raw_response, re.DOTALL).group()
             fused_results = json.loads(json_str)
         except Exception as e:
-            print(f"Errore nel parsing JSON di Qwen: {e}")
+            print(f"Error in JSON parsing of Qwen: {e}")
             return
 
-        # 4. Aggiornamento del Grafo (Logica di Re-wiring)
+        # 4. Graph Update (Re-wiring Logic)
         for group in fused_results:
             new_title = group["EVENT_TITLE"]
             new_details = group["EVENT_DETAILS"]
@@ -794,7 +794,7 @@ class CausalRAG:
 
             if not original_nodes: continue
 
-            # Crea il nuovo nodo se non esiste
+            # Create the new node if it doesn't exist
             if new_title not in self.graph:
                 self.graph.add_node(new_title)
 
@@ -804,32 +804,32 @@ class CausalRAG:
                 if old_node == new_title or old_node not in self.graph:
                     continue
 
-                # Sposta gli archi uscenti: (old_node -> neighbor) diventa (new_title -> neighbor)
+                # Move outgoing edges: (old_node -> neighbor) becomes (new_title -> neighbor)
                 for neighbor in list(self.graph.successors(old_node)):
                     edge_data = self.graph.get_edge_data(old_node, neighbor)
                     self.graph.add_edge(new_title, neighbor, **edge_data)
 
-                # Sposta gli archi entranti: (predecessor -> old_node) diventa (predecessor -> new_title)
+                # Move incoming edges: (predecessor -> old_node) becomes (predecessor -> new_title)
                 for predecessor in list(self.graph.predecessors(old_node)):
                     edge_data = self.graph.get_edge_data(predecessor, old_node)
                     self.graph.add_edge(predecessor, new_title, **edge_data)
 
-                # Rimuovi il vecchio nodo
+                # Remove the old node
                 self.graph.remove_node(old_node)
                 if old_node in self.node_to_content:
                     old_content= self.node_to_content[old_node]
                     del self.node_to_content[old_node]
-                print(f"✓ Fuso node ID: {old_node} ---> {new_title}")
+                print(f"✓ Merged node ID: {old_node} ---> {new_title}")
                 print(f"✓ Content: {old_content} ---> {new_details}")
 
 
 
     def merge_nodes_and_sync_db(self, threshold=0.80):
         """
-        Fonde i nodi simili nel grafo e ricostruisce il Vector Store FAISS
-        per evitare errori di 'Node not in G'.
+        Merges similar nodes in the graph and rebuilds the FAISS Vector Store
+        to avoid 'Node not in G' errors.
         """
-        print(f"Inizio pulizia grafo: {len(self.graph.nodes)} nodi attuali.")
+        print(f"Starting graph cleanup: {len(self.graph.nodes)} current nodes.")
 
         nodes = list(self.graph.nodes())
 
@@ -848,17 +848,17 @@ class CausalRAG:
 
             if possible_node_to_fuse:
                 possible_node_to_fuse.append(u)
-                # Fare richiesta a qwen
+                # Make request to qwen
                 self.merge_similare_nodes(possible_node_to_fuse)
 
-        # 3. RICOSTRUZIONE TOTALE DEL VECTOR STORE (FAISS)
+        # 3. COMPLETE RECONSTRUCTION OF THE VECTOR STORE (FAISS)
         remaining_nodes = list(self.graph.nodes())
-        # Prepariamo i nuovi dati basandoci SOLO su ciò che è rimasto nel grafo
+        # Prepare new data based ONLY on what remains in the graph
         new_texts = []
         new_metadatas = []
 
         for nid in remaining_nodes:
-            # Recuperiamo il testo pulito (o l'ID stesso se manca il contenuto)
+            # Retrieve the clean text (or the ID itself if content is missing)
             content = self.node_to_content.get(nid, str(nid))
             if isinstance(content, dict):
                 content = content.get('text', str(content))
@@ -866,39 +866,39 @@ class CausalRAG:
             new_texts.append(str(content))
             new_metadatas.append({"node_id": nid})
 
-        # Sovrascriviamo il vecchio vector_store con uno nuovo di zecca
+        # Overwrite the old vector_store with a brand new one
         self.vector_store = FAISS.from_texts(
             texts=new_texts,
             embedding=self.embeddings,
             metadatas=new_metadatas
         )
-        # BM25 lavora su una lista di oggetti Documents
+        # BM25 works on a list of Documents objects
         new_docs = [
             Document(page_content=t, metadata=m)
             for t, m in zip(new_texts, new_metadatas)
         ]
         self.bm25_retriever = BM25Retriever.from_documents(new_docs)
 
-        print(f"✓ Sincronizzazione completata.")
-        print(f"✓ Nodi finali nel grafo: {len(self.graph.nodes)}")
-        print(f"✓ Nodi finali nel DB: {len(new_texts)}")
+        print(f"✓ Synchronization completed.")
+        print(f"✓ Final nodes in the graph: {len(self.graph.nodes)}")
+        print(f"✓ Final nodes in the DB: {len(new_texts)}")
 
 
 
 # ============================================================================
-# UTILIZZO PER SEMEVAL
+# USAGE FOR SEMEVAL
 # ============================================================================
 
 def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, type_search="partial_paths") -> str:
     """
-    Genera un sommario causale di causa ed effetto utilizzando CausalRAG.
+    Generates a causal summary of cause and effect using CausalRAG.
     """
     context = ""
     # Initialize result outside the if condition
     result = {'has_path': False, 'context': ''}
 
     if type_search=="full_paths":
-        # Verifica causalità
+        # Verify causality
         result = causal_rag.is_causal_relation(
                 cause=cause,
                 effect=effect
@@ -927,7 +927,7 @@ def build_causal_context(causal_rag, target_event, options):
     raw_context=""
     for option_text in options:
 
-          # none of the others detection
+          # None of the others detection
           if "none of the others are correct causes" in option_text.lower().strip():
             continue
 
@@ -963,7 +963,7 @@ def search_causal_query(causal_rag, query, target_event, options)-> str:
         relations.append(f"- {c_text} --[{rel}]--> {e_text.lower()}")
         nodes_with_edges.update([u, v])
 
-    # Recupero Nodi "Orfani" o Specifici (Dettagli aggiuntivi)
+    # Retrieve "Orphan" or Specific Nodes (Additional context)
     context = []
         
     for node_id in extended_nodes:
@@ -995,8 +995,8 @@ def search_causal_query(causal_rag, query, target_event, options)-> str:
 
 def generate_text_summary_from_causal_chain(causal_rag, raw_context, target_event, options):
         """
-        Sintetizza le catene grezze in un testo narrativo che evidenzia l'intensità
-        e la natura dei legami causali senza inventare connessioni.
+        Synthesizes raw chains into a narrative text that highlights the intensity
+        and nature of causal links without inventing connections.
         """
         
         system_content = f"""You are a Causal Data Refiner. 

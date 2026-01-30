@@ -8,19 +8,19 @@ class RagChain:
         self.k_final = k_final
         self.reranker = reranker
         self.k_per_option = k_per_option
-        self.vector_index = {} # Dizionario per topic_id -> {'embeddings': ..., 'chunks': ...}
+        self.vector_index = {} # Dictionary for topic_id -> {'embeddings': ..., 'chunks': ...}
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
     def doc_splitter(self, text):
         """
-        Divide il testo in frasi e le raggruppa in chunk rispettando i limiti.
+        Splits the text into sentences and groups them into chunks respecting limits.
         """
-        # 1. Pulizia preventiva
+        # 1. Preventive cleanup
         text = re.sub(r'[\n\r\t]+', ' ', text)
         text = re.sub(r'\s+', ' ', text)
 
-        # 2. Split in frasi
+        # 2. Split into sentences
         sentences = re.split(r'(?<=[.!?]) +', text.strip())
 
         chunks = []
@@ -29,7 +29,7 @@ class RagChain:
         for sentence in sentences:
             if len(sentence) > self.chunk_size:
                 if current_chunk: chunks.append(current_chunk.strip())
-                chunks.append(sentence[:self.chunk_size].strip()) # Troncamento estremo
+                chunks.append(sentence[:self.chunk_size].strip()) # Extreme truncation
                 current_chunk = ""
                 continue
 
@@ -37,8 +37,8 @@ class RagChain:
                 current_chunk += (" " if current_chunk else "") + sentence
             else:
                 chunks.append(current_chunk.strip())
-                # Semplice logica di overlap: ricominciamo dalla frase attuale
-                # (Puoi potenziarla recuperando le ultime frasi del chunk precedente)
+                # Simple overlap logic: restart from the current sentence
+                # (You can enhance it by recovering the last sentences from the previous chunk)
                 current_chunk = sentence
 
         if current_chunk:
@@ -46,43 +46,43 @@ class RagChain:
         return chunks
 
     def _get_keywords(self, text, exclude_set=None):
-        """Estrae parole significative escludendo le stop-words e un set opzionale di entità."""
+        """Extracts significant words excluding stop-words and an optional set of entities."""
         stop_words = {'the', 'a', 'an', 'in', 'on', 'at', 'of', 'for', 'with', 'by', 'was', 'were', 'is', 'are', 'to', 'and', 'or', 'but', 'how'}
 
-        # Pulizia base
+        # Basic cleanup
         words = re.findall(r'\w+', text.lower())
 
-        # Set finale di parole chiave
+        # Final set of keywords
         keywords = {w for w in words if w not in stop_words and len(w) > 2}
 
-        # Point 1: Rimuoviamo le entità "rumorose" (il soggetto della domanda)
+        # Point 1: Remove "noisy" entities (the subject of the question)
         if exclude_set:
             keywords = keywords - exclude_set
 
         return keywords
 
     def index_documents(self, docs_by_topic):
-        """Trasforma i documenti in chunk e crea gli indici vettoriali per ogni topic."""
+        """Transforms documents into chunks and creates vector indices for each topic."""
         for topic_id, doc_list in docs_by_topic.items():
             all_topic_chunks = []
             for d in doc_list:
                 content = d.get("content", "")
                 if content:
-                    # Dividiamo il documento in piccoli pezzi
+                    # Split the document into small pieces
                     doc_chunks = self.doc_splitter(content)
                     all_topic_chunks.extend(doc_chunks)
 
             if all_topic_chunks:
-                # Trasformiamo tutti i chunk del topic in vettori in un colpo solo
+                # Transform all chunks of the topic into vectors in one go
                 embeddings = self.embedder.encode(all_topic_chunks, convert_to_tensor=True)
                 self.vector_index[topic_id] = {
                     "chunks": all_topic_chunks,
                     "embeddings": embeddings
                 }
-        print(f"Indicizzazione completata per {len(self.vector_index)} topic.")
+        print(f"Indexing completed for {len(self.vector_index)} topics.")
 
     def retrieve(self, topic_id, question, options):
-        """Recupera i chunk più simili per ognuna delle 4 opzioni."""
+        """Retrieves the most similar chunks for each of the 4 options."""
         if topic_id not in self.vector_index:
             return []
 
@@ -93,14 +93,14 @@ class RagChain:
         selected_indices = set()
 
         for opt in options:
-            # Query composta: Domanda + Opzione specifica
+            # Composite query: Question + Specific option
             query_text = f"Question: {question} Option: {opt}"
             query_vec = self.embedder.encode(query_text, convert_to_tensor=True).reshape(1, -1)
 
-            # Calcolo similarità con tutti i chunk del topic
+            # Calculate similarity with all chunks of the topic
             similarities = compute_cosine_similarity(query_vec, chunk_embeddings)[0]
 
-            # Recupero i top K per questa specifica opzione
+            # Retrieve top K for this specific option
             top_k = torch.topk(similarities, k=min(self.k_per_option, len(all_chunks)))
             for idx in top_k.indices:
                 selected_indices.add(idx.item())
@@ -109,13 +109,12 @@ class RagChain:
 
 
     def retrieve_hybrid(self, topic_id: int, question: str, options: List[str]) -> List[str]:
-          if topic_id not in self.vector_index: return []
 
           data = self.vector_index[topic_id]
           chunks = data["chunks"]
           embeddings = data["embeddings"]
 
-          # Identifichiamo il "soggetto" della domanda per non dargli boost
+          # Identify the "subject" of the question to avoid boosting it
           subject_keywords = self._get_keywords(question)
           #print(f"\nSubject Keywords: {subject_keywords}\n")
           final_indices = {}
@@ -123,55 +122,55 @@ class RagChain:
           for opt in options:
               if "none of the others" in opt.lower(): continue
 
-              # 1. Semantica (Bi-Encoder)
+              # 1. Semantic (Bi-Encoder)
               # ---------------------------------------------------------
               # ### NEW: MULTI-QUERY STRATEGY
               # ---------------------------------------------------------
-              # Generiamo 3 prospettive diverse per massimizzare il recupero
+              # Generate 3 different perspectives to maximize retrieval
               queries = [
-                  f"Evidence that {opt} is the cause of {question}",  # 1. Causale (Originale)
-                  f"{opt}",                                           # 2. Focus sull'Opzione (Chi è/Cos'è?)
-                  f"{question}"                                       # 3. Focus sull'Evento (Cos'è successo?)
+                  f"Evidence that {opt} is the cause of {question}",  # 1. Causal (Original)
+                  f"{opt}",                                           # 2. Focus on the Option (Who is/What is?)
+                  f"{question}"                                       # 3. Focus on the Event (What happened?)
               ]
 
               ''' print(f"\nQueries of retrieve Hybrid========\n")
               for q in queries:
                 print(q)
  '''
-              # Codifichiamo tutte le query in batch [3, 768]
+              # Encode all queries in batch [3, 768]
               q_embs = self.embedder.encode(queries, convert_to_tensor=True)
-              # Calcoliamo la similarità di TUTTE le query contro TUTTI i chunk [3, num_chunks]
-              # compute_cosine_similarity supporta matrici, quindi funziona nativamente
+              # Calculate similarity of ALL queries against ALL chunks [3, num_chunks]
+              # compute_cosine_similarity supports matrices, so it works natively
               all_sims = compute_cosine_similarity(q_embs, embeddings)
 
-              # "Max-Pooling" delle similarità: per ogni chunk, teniamo il punteggio più alto
-              # ottenuto tra le 3 query. Se un chunk parla molto bene dell'evento ma non della causa,
-              # verrà comunque pescato grazie alla query #3.
+              # "Max-Pooling" of similarities: for each chunk, keep the highest score
+              # obtained among the 3 queries. If a chunk speaks well about the event but not the cause,
+              # it will still be retrieved thanks to query #3.
               best_sims, _ = torch.max(all_sims, dim=0) # [num_chunks]
 
-              # 2. Keyword Boosting Intelligente
-              # Escludiamo le parole della domanda per focalizzarci solo su ciò che aggiunge l'opzione
+              # 2. Intelligent Keyword Boosting
+              # Exclude the words of the question to focus only on what the option adds
               opt_keywords = self._get_keywords(opt, exclude_set=subject_keywords)
 
               boosts = []
               for c in chunks:
                   c_lower = c.lower()
-                  # Boost alto (2.0) solo per le parole specifiche e nuove dell'opzione
+                  # High boost (2.0) only for specific and new words of the option
                   score = sum(2.0 for kw in opt_keywords if kw in c_lower)
                   boosts.append(score * 0.1)
 
               boost_tensor = torch.tensor(boosts, device=best_sims.device)
               combined = best_sims + boost_tensor
 
-              # Prendiamo i top 15 per ogni opzione come candidati per il reranker
+              # Take top 15 for each option as candidates for the reranker
               vals, idxs = torch.topk(combined, k=min(self.k_per_option, len(chunks)))
               for v, i in zip(vals, idxs):
                   idx_item = i.item()
-                  # Logica di unione: se un chunk è già stato trovato, aggiorniamo il suo score se è migliore
+                  # Union logic: if a chunk was already found, update its score if it's better
                   if idx_item not in final_indices or v > final_indices[idx_item]:
                       final_indices[idx_item] = v
 
-          # Deduplicazione e preparazione lista per Reranker
+          # Deduplication and preparation for Reranker
           sorted_idx = sorted(final_indices, key=final_indices.get, reverse=True)
           unique_candidates = []
           seen_texts = set()
@@ -185,7 +184,7 @@ class RagChain:
           return unique_candidates
 
     def retrieve_and_rerank(self, topic_id, question, options):
-          # 1. Fase di Retrieval Hybrid (prende 20 candidati basandosi su semantica + keyword)
+          # 1. Hybrid Retrieval Phase (retrieves 20 candidates based on semantic + keyword)
           candidates = self.retrieve_hybrid(topic_id, question, options)
 
           ''' print(f"\n Candidates, to be reranked ================")
@@ -195,8 +194,8 @@ class RagChain:
  '''
           if not candidates: return []
 
-          # 2. Fase di Reranking (Cross-Encoder)
-          # Costruiamo una query che chieda al modello di trovare la causa
+          # 2. Reranking Phase (Cross-Encoder)
+          # Build a query that asks the model to find the cause
           query = f"Target Event: {question}. Which text provides evidence for these options: {', '.join(options)}?"
 
           #print(f"\nQuery of reranker======================\n {query}\n")
@@ -204,8 +203,8 @@ class RagChain:
           pairs = [[query, cand] for cand in candidates]
           scores = self.reranker.predict(pairs)
 
-          # Ordiniamo i chunk per lo score del Reranker
-          # Il Cross-Encoder capirà che "Abe segretario nel 2000" non è utile per "Video social nel 2022"
+          # Sort chunks by Reranker score
+          # The Cross-Encoder will understand that "Abe secretary in 2000" is not useful for "Social video in 2022"
           ranked_candidates = [c for _, c in sorted(zip(scores, candidates), reverse=True)]
 
           return ranked_candidates[:self.k_final]
@@ -262,13 +261,13 @@ def search_query(rag,query,topic_id):
 
 def compute_cosine_similarity(query_embedding, chunk_embeddings):
     """
-    Calcola la similarità coseno tra una query e una matrice di chunk.
+    Calculate cosine similarity between a query and a matrix of chunks.
     query_embedding: [1, d]
     chunk_embeddings: [n_chunks, d]
     """
-    # Normalizzazione per ottenere il prodotto scalare come similarità coseno
+    # Normalization to obtain the scalar product as cosine similarity
     query_norm = torch.nn.functional.normalize(query_embedding, p=2, dim=1)
     chunk_norms = torch.nn.functional.normalize(chunk_embeddings, p=2, dim=1)
 
-    # Risultato: tensore di similarità [1, n_chunks]
+    # Result: similarity tensor [1, n_chunks]
     return torch.mm(query_norm, chunk_norms.transpose(0, 1))
