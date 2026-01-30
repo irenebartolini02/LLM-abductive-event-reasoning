@@ -921,3 +921,126 @@ def generate_causal_summary(causal_rag: CausalRAG,  cause, effect, type_search="
         )
 
     return context
+
+
+def build_causal_context(causal_rag, target_event, options):
+    raw_context=""
+    for option_text in options:
+
+          # none of the others detection
+          if "none of the others are correct causes" in option_text.lower().strip():
+            continue
+
+          cause= option_text
+          effect=target_event
+          
+          context = causal_rag.find_partial_causal_paths(
+                cause=cause,
+                effect=effect
+          )
+    
+          raw_context+="\n\n"+ context
+    # OOM problems
+    if len(raw_context) >=8000 :
+        raw_context= raw_context[:8000] + "..."
+    context_text= generate_text_summary_from_causal_chain(causal_rag, raw_context, target_event, options)
+        
+  
+    return context_text
+
+
+def search_causal_query(causal_rag, query, target_event, options)-> str:
+     
+    relevant_nodes= causal_rag.retrieve_relevant_nodes(query)
+    extended_nodes = causal_rag.expand_nodes(relevant_nodes)
+    subgraph = causal_rag.graph.subgraph(extended_nodes)
+    relations = []
+    nodes_with_edges = set()
+    for u, v, data in subgraph.edges(data=True):
+        c_text = data.get('cause_text', u)
+        e_text = data.get('effect_text', v)
+        rel = data.get('relation', 'leads to').replace("_", " ")
+        relations.append(f"- {c_text} --[{rel}]--> {e_text.lower()}")
+        nodes_with_edges.update([u, v])
+
+    # Recupero Nodi "Orfani" o Specifici (Dettagli aggiuntivi)
+    context = []
+        
+    for node_id in extended_nodes:
+        if node_id not in nodes_with_edges:
+            node_text = causal_rag.graph.nodes[node_id].get('text', node_id)
+            context.append(f"-Detail: {node_text}")
+        
+    summary_parts = []
+    if relations:
+        summary_parts.append("Relevant causal chains in context:\n" + "\n".join(list(set(relations))[:12]))
+
+    if context:
+        summary_parts.append("Additional context:\n" + "\n".join(list(set(context))[:5]))
+
+    if not summary_parts:
+        summary = "No relevant context found."
+    else:
+        summary = "Causal chains"+"\n\n".join(summary_parts)
+
+    # OOM problems
+    if len(summary) >=5000:
+        summary= summary[:5000] + "..."
+        
+    summary= generate_text_summary_from_causal_chain(causal_rag, summary, target_event, options)
+        
+    return summary
+    
+
+
+def generate_text_summary_from_causal_chain(causal_rag, raw_context, target_event, options):
+        """
+        Sintetizza le catene grezze in un testo narrativo che evidenzia l'intensità
+        e la natura dei legami causali senza inventare connessioni.
+        """
+        
+        system_content = f"""You are a Causal Data Refiner. 
+            Your ONLY task is to synthesize raw causal segments into a factual text paragraph.
+            
+            STRICT RULES:
+            1. NO INFERENCE: Do not evaluate if a cause is "true" or "plausible". If the input says A --[LEADS_TO]--> B, write that A led to B. 
+            2. ZERO NOISE: Delete details (names, numbers, side-events, adjectives) and causal chains that are not related with CANDIDATE CAUSE and the TARGET EVENT. 
+            3. NO COMMENTS: Output ONLY the paragraph. Do not explain your choices or add introductory phrases.
+            4. DATA LOYALTY: If the input provides isolated facts that don't form a chain, list them as independent sentences within the paragraph. Do not force a connection that isn't in the RAW CONTEXT."""
+    
+
+        user_content = f"""RAW CONTEXT:
+        {raw_context}
+
+            TARGET EVENT"{target_event}"
+            CANDIDATE CAUSES:  
+            A) "{options[0]}"
+            B) "{options[1]}"
+            C) "{options[2]}"
+            D) "{options[3]}"
+
+        Synthesize the relevant causal paths:"""
+
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content}
+        ]
+
+        # Utilizziamo l'apply_chat_template per coerenza con il modello Qwen/Llama
+        prompt = causal_rag.llm.pipeline.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        inputs = causal_rag.llm.pipeline.tokenizer(prompt, return_tensors="pt").to(causal_rag.llm.pipeline.model.device)
+        outputs = causal_rag.llm.pipeline.model.generate(
+            **inputs,
+            max_new_tokens=2048,
+            temperature=0.1,
+            do_sample=False
+        )
+
+        summary = causal_rag.llm.pipeline.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Estrazione pulita della risposta dell'assistente
+        if "assistant\n" in summary:
+            summary = summary.split("assistant\n")[-1].strip()
+
+        return summary
+
