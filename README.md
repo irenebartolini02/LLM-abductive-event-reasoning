@@ -66,6 +66,7 @@ Project/
 ├── experiments_guide_CausalRAG.ipynb
 ├── experiments-guide-kaggle.ipynb
 ├── notebook_quickstart.ipynb
+├── technical_report.pdf #the paper describing the project
 └── README.md       # Comprehensive project documentation
 ```
 
