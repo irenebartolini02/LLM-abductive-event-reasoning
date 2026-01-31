@@ -2,54 +2,11 @@ import re
 from typing import Dict, List, Optional
 import re
 import ast
-
 import re
 from typing import Dict, List
-
 import torch
 
-
-SEARCH_AGENT = (
-    """
-### Instruction
-You are an **Evidence Evaluator** for causal inference. 
-Assess if <Context> provides enough evidence to evaluate <Options> as causes of <Event>. 
-Generate targeted queries for missing information.
-
-**Important:** Multiple options can be correct causes.
-
-### Input
-<Context>: Available information
-<Event>: Outcome to explain
-<Options>: Potential causes (A, B, C, D)
-
-### The Decision Logic
-1.  **Relevance Filter (Pre-Computation):**
-    - **Discard** options that are clearly unrelated, illogical, or describe irrelevant details (e.g., specific times/names that don't change the outcome) relative to the <Event>.
-    - **Keep** options that represent plausible causes.
-2.  **Verification (The Search Trigger):**
-    - Check the **Remaining (Plausible) Options** against the <Context>.
-    - If a *Plausible* Option is missing evidence -> **Action: `Search[...]`**.
-3.  **Sufficiency:** - Output `SUFFICIENT` if all **Plausible** options are confirmed or refuted. 
-       In order to be SUFFICIENT the context should provide: 
-       - TEMPORAL EVIDENCE: The evidence that th Option happend before or after the Event.
-       - CAUSAL MECHANISM: logical mechanism linking the Option to the Event.
-4.  **Query Formulation (Fact-Oriented)**: - Do NOT generate questions (e.g., "Was there a shooting?").
-    Generate declarative factual strings or search keywords (e.g., "Ashli Babbitt shooting incident Capitol", "David Cameron referendum pledge 2013").
-    Focus on entities, dates, and specific events mentioned in the options.
-    
-(Note: You do NOT need to verify the discarded "irrelevant" options to declare sufficiency).
-
-### Output Format
-Discarded options: [Letters]
-Proposal options: [Letters]
-Reasoning: [Brief analysis of which options are supported vs. missing info]
-Action: SUFFICIENT or SEARCH
-Queries: ['query1', 'query2', 'quer'] 
-
-
-"""
-)
+from prompts.template import SEARCH_AGENT
 
 
 def search_agent(model, tokenizer , context,question):

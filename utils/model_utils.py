@@ -5,6 +5,7 @@ import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from utils.output_utils import clean_response, calculate_score
 
+
 def load_model( MODEL_NAME: str):
     """Load a Qwen model from the given model name."""
     # 1. Definition of the quantization
@@ -62,3 +63,9 @@ Answer (letters only):"""
   prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
   return prompt
 
+
+
+
+embed_model = SentenceTransformer('BAAI/bge-base-en-v1.5')
+reranker_model_name='cross-encoder/ms-marco-MiniLM-L-6-v2'
+reranker = CrossEncoder(reranker_model_name, device=device)

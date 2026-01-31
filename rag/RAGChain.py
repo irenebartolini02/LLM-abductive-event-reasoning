@@ -124,7 +124,7 @@ class RagChain:
 
               # 1. Semantic (Bi-Encoder)
               # ---------------------------------------------------------
-              # ### NEW: MULTI-QUERY STRATEGY
+              # ### MULTI-QUERY STRATEGY
               # ---------------------------------------------------------
               # Generate 3 different perspectives to maximize retrieval
               queries = [
