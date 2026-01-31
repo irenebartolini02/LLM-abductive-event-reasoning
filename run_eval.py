@@ -105,7 +105,7 @@ def main():
         # --- RESTORE FROM CHECKPOINT FOR WANDB LOGGING ---
         if os.path.exists(args.output_file):
             print(f"Recupero checkpoint da {args.output_file}...")
-            with open(args.dataset_path, 'r', encoding='utf-8') as f:
+            with open(args.output_file, 'r', encoding='utf-8') as f:
                 for line in f:
                     try:
                         data = json.loads(line.strip())
