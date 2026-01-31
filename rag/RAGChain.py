@@ -255,10 +255,9 @@ def build_context(rag, topic_id, target_event, options):
     # Restituisce i chunk uniti come stringa
     return "\n\n".join([f"[Initial Chunk {i+1}]: {c}" for i, c in enumerate(top_chunks)])
 
-def search_query(rag,query,topic_id):
+def search_query(rag,query,topic_id,s):
     top_chunks = rag.search(query=query, topic_id=topic_id,k=1)
     return "\n\n".join([f"[Retrieved chunk for: {query}]: {c}" for i, c in enumerate(top_chunks)])
-
 
 def compute_cosine_similarity(query_embedding, chunk_embeddings):
     """
