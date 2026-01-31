@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from prompts.template import SEARCH_AGENT_SYSTEM, CAUSAL_AGENT_SYSTEM
+
 from agents.searcher import search_agent  # Assuming you moved search_agent logic to agents/searcher.py
 from agents.reasoner import reasoner_agent  # Assuming you moved causal_agent logic to agents/reasoner.py
 from rag.RAGChain import RagChain, build_context, search_query
