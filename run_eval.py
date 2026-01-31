@@ -262,7 +262,7 @@ def main():
             elif score > 0: running_stats["partial"] += 1
             else: running_stats["wrong"] += 1
 
-            if args.use_debug:
+            if args.use_wandb:
                 wandb.log({
                     "progress": count,
                     "global/correct": running_stats["correct"] / count,
