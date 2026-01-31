@@ -431,7 +431,9 @@ To modify evaluation parameters, edit the configuration section in `run_eval.py`
 
 To replicate the full evaluation pipeline **without running the entire codebase manually**, use the provided Jupyter notebook: **[notebook_quickstart.ipynb](notebook_quickstart.ipynb)**
 
-This notebook provides an end-to-end, executable walkthrough of the evaluation process and is the **recommended entry point for replication**.
+The notebook was developed and executed on Kaggle, so file paths and environment assumptions follow Kaggle’s runtime setup.
+
+It offers an end-to-end, executable walkthrough of the evaluation process and serves as the **recommended entry point for replication**.
 
 ### What the notebook does
 - Loads the SemEval-style dataset and associated documents
