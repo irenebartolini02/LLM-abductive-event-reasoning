@@ -9,6 +9,28 @@
 
 ---
 
+## Table of Contents
+
+1. [Executive Summary](#1-executive-summary)
+2. [Project Structure](#2-project-structure)
+3. [Technical Architecture](#3-technical-architecture)
+   - [Multi-Agent Pipeline](#31-multi-agent-pipeline)
+   - [Retrieval-Augmented Generation (RAG)](#32-retrieval-augmented-generation-rag)
+4. [Core Components](#4-core-components)
+   - [Agents Module](#41-agents-module)
+   - [RAG Module](#42-rag-module)
+5. [Utilities Module](#5-utilities-module)
+6. [Evaluation Framework](#6-evaluation-framework)
+   - [Dataset Structure](#61-dataset-structure)
+   - [Checkpoint Management](#62-checkpoint-management)
+   - [Metrics](#63-metrics)
+7. [Advanced Features](#7-advanced-features)
+8. [Setup & Installation](#8-setup--installation)
+9. [Execute Evaluation](#9-execute-evaluation)
+   - [Configuration](#91-configuration)
+10. [Replication](#10-replication)
+11. [Performance & Results](#10-performance--results)
+
 ## 1. Executive Summary
 
 This project implements a comprehensive framework for **Abductive Event Reasoning** using Large Language Models (LLMs) combined with Retrieval-Augmented Generation (RAG). The system is evaluated on the SemEval 2026 Task, which requires identifying the most plausible direct cause(s) of a given event from four options.
@@ -43,13 +65,8 @@ Project/
 ├── results/                   # Evaluation outputs
 ├── experiments_guide_CausalRAG.ipynb
 ├── experiments-guide-kaggle.ipynb
-├── Gemma_reasoning_evaluation.ipynb
-├── Hermes_reasoning_evaluation.ipynb
-├── Qwen_reasoning_evaluation.ipynb
-├── Solar_from_template.ipynb
-├── PROJECT_REPORT.md         # Comprehensive project documentation
-├── evaluation_checkpoint_solar.jsonl
-└── README.md
+├── notebook_quickstart.ipynb
+└── README.md       # Comprehensive project documentation
 ```
 
 ---
@@ -66,7 +83,7 @@ The system implements a two-agent reasoning pipeline:
 │   ────────────────────────────────────  │
 │   • Evaluates sufficiency of context    │
 │   • Generates targeted search queries   │
-│   • Returns: is_sufficient, queries     │
+│   • Returns: is_sufficient or queries   │
 └──────────────┬──────────────────────────┘
                │
                ▼
@@ -126,16 +143,8 @@ generate_text_summary()          # Chain synthesis
 
 **Input**: Context, Event, Options (A-D)
 
-**Output**:
-```python
-{
-    "discarded": [],           # Clearly irrelevant options
-    "proposal": ["A", "B"],    # Plausible options to verify
-    "reasoning": "...",        # Analysis explanation
-    "is_sufficient": True,     # Whether to search for more info
-    "queries": ["query1", ...] # Targeted search queries
-}
-```
+**Output**: is_sufficient or query['query1','query2']
+
 
 **Strategy**: Relevance Filter + Verification Logic
 
@@ -144,13 +153,8 @@ generate_text_summary()          # Chain synthesis
 
 **Input**: Context, Event, Options
 
-**Output**:
-```python
-{
-    "reasoning": "...",  # Full reasoning trace
-    "answer": ["A", "C"] # Accepted options
-}
-```
+**Output**: Final Answer [A,B]
+
 
 **Key Constraints**:
 - DIRECT CAUSE: Max 1 intermediary step
@@ -185,8 +189,8 @@ generate_text_summary()          # Chain synthesis
 RagChain(
     embedding_model,        # Bi-encoder for semantic search
     reranker,              # Cross-encoder for ranking
-    k_per_option=10,       # Candidates per option
-    k_final=5,             # Final returned chunks
+    k_per_option=20,       # Candidates per option
+    k_final=2,             # Final returned chunks
     chunk_size=800,        # Document chunk size
     chunk_overlap=150      # Overlap between chunks
 )
@@ -422,9 +426,20 @@ To modify evaluation parameters, edit the configuration section in `run_eval.py`
  
 ---
 
-## 10. Performance & Results
+## 10. Replication
 
-### 10.1 Evaluation Metrics
+To replicate the full evaluation pipeline **without running the entire codebase manually**, use the provided Jupyter notebook: **[notebook_quickstart.ipynb](notebook_quickstart.ipynb)**
+
+This notebook provides an end-to-end, executable walkthrough of the evaluation process and is the **recommended entry point for replication**.
+
+### What the notebook does
+- Loads the SemEval-style dataset and associated documents
+- Runs the multi-agent loop (Search → Reason → Extract)
+- Computes evaluation metrics and saves checkpoint outputs
+
+## 11. Performance & Results
+
+### 11.1 Evaluation Metrics
 
 Results are saved in checkpoint format (JSONL) with the following fields:
 - `uuid`: Question ID
