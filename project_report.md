@@ -86,7 +86,7 @@ The system implements a two-agent reasoning pipeline:
 
 #### RAGChain Component
 - **Hybrid Retrieval**: Combines BM25 (keyword-based) and semantic (bi-encoder) search
-- **Multi-Query Strategy**: Generates 3 diverse query perspectives for each option
+- **Multi-Query Strategy**: Generates different query perspectives
 - **Intelligent Boosting**: Keywords specific to options are boosted while excluding question subjects
 - **Cross-Encoder Reranking**: Uses sentence-transformers for relevance scoring
 
