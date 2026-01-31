@@ -4,7 +4,7 @@ import torch
 import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from utils.output_utils import clean_response, calculate_score
-from sentence_transformers import SentenceTransformer, CrossEncoder
+
 
 def load_model( MODEL_NAME: str):
     """Load a Qwen model from the given model name."""
@@ -66,6 +66,3 @@ Answer (letters only):"""
 
 
 
-embed_model = SentenceTransformer('BAAI/bge-base-en-v1.5')
-reranker_model_name='cross-encoder/ms-marco-MiniLM-L-6-v2'
-reranker = CrossEncoder(reranker_model_name, device=device)
