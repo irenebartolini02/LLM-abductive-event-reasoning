@@ -49,13 +49,13 @@ def main():
   
     transformers.logging.set_verbosity_error()
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
-    '''
+    
     # --- Load Resources ---
     model_name = "Qwen/Qwen2.5-7B-Instruct"
     print(f"Loading Model: {model_name}")
     model, tokenizer = load_model(model_name)
     print("Model loaded successfully\n")
-    '''
+    
     # --- Load Data ---
     print(f"Loading Data from {args.dataset_path}...")
     # Adjust paths based on your actual dataset structure
