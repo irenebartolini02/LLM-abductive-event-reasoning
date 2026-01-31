@@ -6,6 +6,7 @@ import torch
 import gc
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from tqdm import tqdm
+from typing import List, Dict, Tuple, Optional, Any
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
