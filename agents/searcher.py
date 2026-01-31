@@ -59,89 +59,52 @@ def search_prompt(tokenizer, context, question):
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     return prompt
 
+import re
+from typing import Dict, List, Optional
+
 def search_agent_parser(response_raw: str) -> Dict:
-    # 1. Extract main blocks with Regex (more flexible on line breaks)
-    discarded_match = re.search(r"Discarded options:\s*(.*)", response_raw, re.IGNORECASE)
-    proposal_match = re.search(r"Proposal options:\s*(.*)", response_raw, re.IGNORECASE)
-    # The reasoning stops when it encounters Action: or the end of the text
-    reasoning_match = re.search(r"Reasoning:\s*(.*?)(?=Action:|$)", response_raw, re.IGNORECASE | re.DOTALL)
-    action_match = re.search(r"Action:\s*(\w+)", response_raw, re.IGNORECASE)
-    # Captures everything that follows "Queries:" until the end or the next block
-    query_block_match = re.search(r"Queries:\s*(.*)", response_raw, re.IGNORECASE | re.DOTALL)
-
-    data = {
-        "discarded": [],
-        "proposal": [],
-        "reasoning": "",
-        "is_sufficient": True,
-        "queries": []
+    """
+    Parse a search agent response into a simple dictionary.
+    
+    Args:
+        response_raw: Raw response text from the search agent
+        
+    Returns:
+        Dictionary with keys:
+        - reasoning: str - The complete reasoning text
+        - gap_analysis: Optional[str] - Gap analysis if present
+        - search_queries: List[str] - Extracted search queries
+        - is_sufficient: bool - Whether context is sufficient
+    """
+    
+    # Extract gap analysis
+    gap_match = re.search(r'Gap Analysis:\s*(.+?)(?=\n\s*Action:|\Z)', response_raw, re.DOTALL)
+    gap_analysis = gap_match.group(1).strip() if gap_match else None
+    
+    # Extract action
+    action_match = re.search(r'Action:\s*(.+?)$', response_raw, re.DOTALL)
+    action = action_match.group(1).strip() if action_match else None
+    
+    # Extract search queries from action
+    search_queries = []
+    is_sufficient = False
+    
+    if action:
+        # Check if action is SUFFICIENT
+        is_sufficient = "SUFFICIENT" in action.upper()
+        
+        # Extract queries in Search["query1", "query2"] format
+        search_pattern = r'Search\[([^\]]+)\]'
+        search_match = re.search(search_pattern, action)
+        if search_match:
+            queries_text = search_match.group(1)
+            # Split by quotes (both single and double) and filter
+            query_pattern = r'["\']([^"\']+)["\']'
+            search_queries = re.findall(query_pattern, queries_text)
+    
+    return {
+        "reasoning": response_raw,
+        "gap_analysis": gap_analysis,
+        "search_queries": search_queries,
+        "is_sufficient": is_sufficient
     }
-
-    # 2. Parse Letters (A-D)
-    if discarded_match:
-        data["discarded"] = re.findall(r'[A-D]', discarded_match.group(1).upper())
-    
-    if proposal_match:
-        data["proposal"] = re.findall(r'[A-D]', proposal_match.group(1).upper())
-
-    # 3. Parse Reasoning
-    if reasoning_match:
-        data["reasoning"] = reasoning_match.group(1).strip()
-
-    # 4. Parse Action
-    if action_match:
-        action_val = action_match.group(1).upper()
-        data["is_sufficient"] = "SEARCH" not in action_val
-
-    # 5. Estrazione Query Robusta
-    if not data["is_sufficient"] and query_block_match:
-        query_text = query_block_match.group(1).strip()
-        
-        # --- Strategia A: Cerca il contenuto tra parentesi quadre [ ... ] ---
-        list_match = re.search(r"\[(.*?)\]", query_text, re.DOTALL)
-        if list_match:
-            content = list_match.group(1)
-            # Estraiamo tutto ciò che è tra apici (singoli o doppi)
-            # Questo evita i problemi dello split basato su virgole
-            data["queries"] = [q.strip() for q in re.findall(r"['\"](.*?)['\"]", content) if q.strip()]
-        
-        # --- Strategia B (Fallback): Se A fallisce (es. elenco puntato o testo libero) ---
-        if not data["queries"]:
-            # Prende tutte le stringhe tra virgolette nel blocco, ovunque siano
-            quoted_items = re.findall(r'["\'](.*?)["\']', query_text)
-            # Filtro per lunghezza per evitare di prendere singoli caratteri casuali
-            data["queries"] = [q.strip() for q in quoted_items if len(q.strip()) > 3]
-            
-        # --- Strategia C (Extrema Ratio): Se ancora vuoto, split per linee ---
-        if not data["queries"]:
-            lines = [l.strip(" '\"-•*") for l in query_text.split('\n') if len(l.strip()) > 5]
-            if lines:
-                data["queries"] = lines
-
-    return data
-
-
-def format_parsed_response(parsed: Dict) -> str:
-    """Format a parsed response dictionary for readable display"""
-    lines = []
-    lines.append("=" * 60)
-    lines.append("PARSED SEARCH AGENT RESPONSE")
-    lines.append("=" * 60)
-    
-    lines.append(f"\nIs Sufficient: {parsed['is_sufficient']}")
-    
-    if parsed['gap_analysis']:
-        lines.append(f"\nGap Analysis:\n{parsed['gap_analysis']}")
-    
-    if parsed['search_queries']:
-        lines.append(f"\nSearch Queries ({len(parsed['search_queries'])}):")
-        for i, q in enumerate(parsed['search_queries'], 1):
-            lines.append(f"  {i}. {q}")
-    
-    lines.append(f"\nFull Reasoning:\n{parsed['reasoning'][:500]}...")
-    lines.append("=" * 60)
-    
-    return "\n".join(lines)
-
-
-
