@@ -4,7 +4,7 @@ import torch
 import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from utils.output_utils import clean_response, calculate_score
-
+from sentence_transformers import SentenceTransformer
 
 def load_model( MODEL_NAME: str):
     """Load a Qwen model from the given model name."""
