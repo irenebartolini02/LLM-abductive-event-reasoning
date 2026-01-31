@@ -120,19 +120,22 @@ def main():
                         if score == 1.0: running_stats["correct"] += 1
                         elif score > 0: running_stats["partial"] += 1
                         else: running_stats["wrong"] += 1
+
+                        # This reconstructs the graph for the historical data
+                        if args.use_wandb and count > 0:
+                            wandb.log({
+                                "progress": count,
+                                "global/correct": running_stats["correct"] / count,
+                                "global/partial": running_stats["partial"] / count,
+                                "global/error_rate": running_stats["wrong"] / count,
+                                "global/avg_score": total_score / count,
+                            })
+
                     except json.JSONDecodeError:
                         continue
             print(f"Restored {count} items.")
                         
-            # This reconstructs the graph for the historical data
-            if args.use_wandb and count > 0:
-                wandb.log({
-                    "progress": count,
-                    "global/correct": running_stats["correct"] / count,
-                    "global/partial": running_stats["partial"] / count,
-                    "global/error_rate": running_stats["wrong"] / count,
-                    "global/avg_score": total_score / count,
-                })
+            
     else:
         print("Nessun checkpoint trovato. Inizio da zero.")
 
