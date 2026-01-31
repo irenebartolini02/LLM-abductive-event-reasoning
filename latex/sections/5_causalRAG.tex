@@ -1,0 +1,67 @@
+\section{CausalRAG Extension }
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.85\textwidth]{img/agent_structure_causalRAG.png}
+    \caption{Agent Workflow with Causal RAG }
+    \label{fig:agent_causal_rag}
+\end{figure*}
+
+In addition to our primary strategy, we implemented a specialized CausalRAG \cite{wang2025causalrag} framework. The foundational premise of this approach lies in the Graph-based Preprocessing phase. Unlike traditional RAG systems that treat document corpora as collections of isolated text chunks, CausalRAG organizes information into a Causal Knowledge Graph (CKG). Within this architecture, nodes represent discrete events or states, while edges explicitly encode the causal-temporal relationships extracted from the source material.
+We hypothesized that this technique would be particularly effective for our task because this preprocessing step is fundamental for Context Augmentation. By transforming unstructured text into a structured topology, the system can traverse relational edges to recover multi-hop causal chains. This capability allows the model to bridge the gap between a trigger event and a distal consequence, even when they are separated by multiple intermediate steps in the narrative. Consequently, this approach effectively mitigates the "context window fragmentation" typical of standard RAG, where the lack of explicit links between retrieved chunks often obscures long-range dependencies.
+To retrieve the optimal context, we employ the following strategy: for a given target event and its associated options, we select the top $k$ nodes based on a combined score from\textbf{ FAISS} (dense semantic similarity) and \textbf{BM25} (sparse lexical matching), the nodes with the higher total score are retrieved. Once these "seed nodes" are identified, the system extracts a relevant subgraph through a bidirectional traversal logic:
+\begin{itemize}
+    \item\textbf{Backward Expansion}: Starting from the target event nodes, the system traverses outgoing edges to identify potential causes
+    \item\textbf{Forward Expansion:} Starting from the options nodes, the system traverses incoming edges to trace back to potential consequences. 
+\end{itemize}
+This traversal is constrained to a maximum of $s$ hops to maintain causal relevance and prevent context dilution.
+
+From the resulting subgraph, all valid causal chains are extracted. These raw paths are then processed by a specialized agent, the Synthesizer. This agent transforms the structured graph data into a coherent, synthetic textual summary. By distilling complex multi-hop relationships into a natural language narrative, the Synthesizer provides the reasoning model with a streamlined and causally-dense context, specifically optimized for decision-making.
+
+\subsection{Experiments}
+
+The evaluation of the CausalRAG approach was restricted to the first twenty Topic IDs within the dataset. This constraint was necessitated by the high computational overhead of the preprocessing phase, specifically the generation of a dedicated Causal Knowledge Graph for each topic, which proved prohibitively resource-intensive given our available hardware.
+Counter-intuitively, our preliminary results indicate that this graph-based technique underperforms relative to the baseline RAG method. This performance gap suggests that while the structural topology of a graph offers theoretical advantages for multi-hop reasoning, the complexity of the graph construction or the potential noise introduced during the extraction of causal edges may currently outweigh the benefits of structured context.
+As illustrated in Table \ref{tab:comparison_results}, while the CausalRAG strategy demonstrates high effectiveness in specific topics, the overall trend is inversely proportional to our initial expectations. Notably, in Topics 14 and 19, the CausalRAG model exhibits significantly poor performance.
+This discrepancy is likely attributable to graph density and noise within the preprocessed knowledge structures. In these instances, the extraction of spurious causal links or the inclusion of irrelevant nodes likely led to contextual drift, where the synthesized summary distracted the model from the core evidence rather than reinforcing it. These results suggest that the quality of the Causal Knowledge Graph is highly topic-dependent, requiring more robust filtering mechanisms to ensure edge reliability.
+
+
+
+
+\begin{table}[t]
+\centering
+\caption{Comparative scores per topic (Hybrid vs. Causal RAG).}
+\label{tab:comparison_results}
+\footnotesize
+\renewcommand{\arraystretch}{0.85} % Riduce lo spazio tra le righe (molto efficace)
+\setlength{\tabcolsep}{8pt}        % Regola lo spazio tra le colonne
+\begin{tabular}{ccc}
+\toprule
+\textbf{ID} & \textbf{Hybrid RAG} & \textbf{Causal RAG} \\
+\midrule
+1  & 7.00  & \textbf{8.00}  \\
+2  & \textbf{7.50}   & 5.50  \\
+3  & \textbf{11.00}  & 10.50 \\
+4  & 5.50  & \textbf{7.00}  \\
+5  & 3.00  & \textbf{4.00}  \\
+6  & \textbf{1.00}   & 0.00  \\
+7  & \textbf{5.00}  & 4.50  \\
+8  & 5.00  & \textbf{7.50}  \\
+9  & 1.00  & \textbf{3.00}  \\
+10 & \textbf{6.50}  & 5.50  \\
+11 & \textbf{3.00}  & 2.00  \\
+12 & \textbf{8.50}  & 5.50  \\
+13 & \textbf{8.50}  & 6.50  \\
+14 & \textbf{3.00} & 0.00  \\
+15 & 5.50  & \textbf{7.00}  \\
+16 & \textbf{6.00}  & 5.50  \\
+17 & 2.00  & 2.00  \\
+18 & \textbf{6.50} & 5.00  \\
+19 & \textbf{16.00} & 10.50 \\
+20 & 7.50  & \textbf{9.00} \\
+\midrule
+\textbf{TOT} & \textbf{119.00} & \textbf{108.50} \\
+\bottomrule
+\end{tabular}
+\end{table}
+

@@ -1,0 +1,59 @@
+\section{Methodology}
+We propose a dual-agent framework that integrates iterative information retrieval with abductive reasoning to solve complex causal inference tasks. Unlike static Retrieval-Augmented Generation (RAG) pipelines, our architecture actively verifies evidence sufficiency before attempting a conclusion.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.85\textwidth]{img/agent_structure_baseline.png}
+    \caption{The decoupled Agentic Workflow, illustrating the separation between the Evidence Evaluator and the Causal Reasoner.}
+    \label{fig:agent_workflow}
+\end{figure*}
+
+\subsection{System Overview}
+The system is built upon the \texttt{Qwen2.5-7B-Instruct} Large Language Model (LLM), quantized to 4-bit (NF4) for computational efficiency. The workflow operates in three distinct phases:
+\begin{enumerate}
+    \item \textbf{Hybrid Retrieval:} A dense-sparse retrieval module gathers initial context using multi-view embeddings and keyword boosting, followed by cross-encoder reranking to filter irrelevant candidates.
+    \item \textbf{Iterative Evidence Verification:} A dedicated \textit{Search Agent} evaluates context sufficiency and dynamically queries for missing data.
+    \item \textbf{Abductive Inference:} A \textit{Causal Agent} reasons over the finalized context to identify the valid causal set.
+\end{enumerate}
+
+\subsection{Hybrid Retrieval Engine}
+To capture high-granularity semantic dependencies, documents are segmented into 800-token chunks with a 256-token overlap. We implement a hybrid scoring function that combines semantic understanding with exact keyword matching.
+
+\subsubsection*{Multi-View Semantic Search}
+We employ a multi-view query strategy using the \texttt{BAAI/bge-base-en-v1.5} embedding model. This design addresses the information asymmetry inherent in causal inference: searching for the target event alone often yields context that is too broad to distinguish between specific causes. \textbf{Analogous to a test-taker who cross-references specific options against their knowledge base rather than answering an open-ended prompt}, our system treats each candidate option as an active retrieval cue. This allows the model to ``work backwards,'' gathering precise evidence to verify or refute each specific hypothesis individually. To operationalize this, for a pair consisting of a question $Q$ and an option $O_i$, we generate three distinct embedding views:
+\begin{itemize}
+    \item \textit{Causal View:} ``Evidence that $O_i$ is the cause of $Q$.''
+    \item \textit{Entity View:} The textual representation of $O_i$.
+    \item \textit{Event View:} The textual representation of the target event $Q$.
+\end{itemize}
+The semantic score $S_{sem}$ for a document chunk $d$ is defined as the maximum cosine similarity across these three views.
+
+\subsubsection*{Heuristic Keyword Boosting}
+To ensure the retrieval of specific named entities (e.g., dates, actors), we apply a dynamic boosting algorithm. Let $K_{opt}$ be the set of keywords extracted from option $O_i$. The final hybrid score $S(d, O_i)$ is calculated as:
+\begin{equation}
+    S(d, O_i) = \max_{v \in \text{views}} \big(\text{sim}(\mathbf{q}_v, d)\big) + \alpha \sum_{w \in K_{opt}} \mathbb{I}(w \in d)
+\end{equation}
+where $\mathbb{I}$ is the indicator function and $\alpha=0.2$ is a hyperparameter balancing semantic relevance and lexical overlap.
+
+\subsubsection*{Reranking}
+The top-$k$ candidates ($k=20$) are reranked using a Cross-Encoder (\texttt{ms-marco-MiniLM-L-6-v2}). This step filters out candidates that are semantically related to the topic but lack the specific relational context required for causal verification.
+
+
+
+\subsection{Agentic Workflow}
+To mitigate the hallucinations common in monolithic RAG systems, we adopt a decoupled architecture inspired by the ReAct framework \cite{yao2023reactsynergizingreasoningacting}. We separate the process into two specialized roles to prevent the model from conflating evidence retrieval with causal derivation.
+
+\subsubsection*{The Search Agent (Evidence Evaluator)}
+This module acts as an iterative investigator. Initialized with the reranked documents, it performs a \textit{Gap Analysis} to determine if the current context supports a definitive conclusion.
+If critical information is missing, the agent generates structured search actions in the format \texttt{Action: Search['query']}. This iterative cycle continues until the agent outputs \texttt{SUFFICIENT} or reaches a configurable maximum depth $K$. In our experiments, we set $K=1$, relying on the agent's ability to issue the most relevant queries to resolve ambiguity in the first refinement step.
+
+\subsubsection*{The Causal Agent (Inference Engine)}
+The Causal Agent receives the finalized context and performs abductive classification. We enforce a strict ``Archival Rule'' via the system prompt, requiring the agent to interpret prospective statements in documents (e.g., "plans to") as valid antecedents for subsequent events.
+The agent selects options based on three logical criteria:
+\begin{itemize}
+    \item \textbf{Temporal Precedence:} The cause must chronologically precede the event.
+    \item \textbf{Mechanism:} A direct explanatory link must exist.
+    \item \textbf{Counterfactual Validity:} The event would not have occurred without the cause.
+\end{itemize}
+The architecture supports multi-label classification, allowing the agent to return a set of answers (e.g., \texttt{[A, C]}) if multiple independent causes are verified.
+

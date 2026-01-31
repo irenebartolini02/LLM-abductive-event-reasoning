@@ -1,0 +1,76 @@
+\section{Experiments}
+
+\subsection{Dataset and Evaluation Metrics}
+We evaluated our framework on the \textbf{SemEval 2026 Task 12} dataset, which consists of complex multiple-choice questions requiring abductive reasoning over event-based corpora.
+
+The evaluation metric accounts for partial correctness in multi-answer scenarios:
+\begin{itemize}
+    \item \textbf{1.0 Point:} The set of predicted answers matches the ground truth exactly.
+    \item \textbf{0.5 Points:} The predicted answers are a valid subset of the ground truth (no incorrect options selected).
+    \item \textbf{0.0 Points:} The prediction includes any incorrect option.
+\end{itemize}
+
+\subsection{Implementation Details}
+All experiments were conducted on a single NVIDIA Tesla P100 GPU. The system is powered by the \texttt{Qwen2.5-7B-Instruct} model, loaded with 4-bit NF4 quantization to optimize memory efficiency. 
+
+\subsubsection*{Retrieval Configuration}
+We utilized the \texttt{bge-base-en-v1.5} embedding model. Documents were partitioned into 800-token chunks with a 256-token overlap. For the retrieval pipeline, we retrieved $k=20$ candidates per option during the initial search, reranking them to select the top $k_{final}=2$ chunks for the final context window.
+
+\subsubsection*{Agent Configuration}
+The Search Agent was configured with a maximum depth of $K=1$ iteration, allowing for a single batch of targeted queries to resolve ambiguity while minimizing latency. Heuristic keyword boosting was applied with $\alpha = 0.2$ to ensure high recall of named entities and temporal markers.
+
+\subsection{Overall Performance}
+Table \ref{tab:results} summarizes the global performance of the architecture. Across the full test set of 400 questions, the model achieved a Total Score of 256.00, yielding an average accuracy of \textbf{0.64}.
+
+\begin{table}[h]
+\centering
+\caption{Overall Performance of the Agentic Architecture.}
+\label{tab:results}
+\begin{tabular}{lc}
+\toprule
+\textbf{Metric} & \textbf{Value} \\ 
+\midrule
+Total Questions & 400 \\
+Correct Answers (Exact) & 212 \\
+Partial Answers (Subset) & 88 \\
+Incorrect Answers & 100 \\ 
+\midrule
+\textbf{Total Score} & \textbf{256.0} \\
+\textbf{Average Score} & \textbf{0.64} \\ 
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Behavioral Analysis}
+A granular analysis of the evaluation logs reveals distinct behavioral characteristics of the decoupled architecture, specifically regarding negative constraints and answer cardinality.
+
+\subsubsection{Aversion to the "None of the Other" Option}
+The model exhibits a significant bias against negative conclusions. In scenarios where the correct answer was ``None of the Other'' (NOTO), the model achieved a Recall of only $56.5\%$ ($N=46$). This result illustrates a well-known and persistent limitation in generative AI: the struggle to identify the absence of evidence. As recently analyzed by Kirichenko et al. \cite{kirichenko2025abstentionbenchreasoningllmsfail}, this ``forced resolution'' bias remains acute even in advanced reasoning models, which often prioritize completing the logical chain over admitting ignorance. Our findings suggest that the agent tends to prioritize the selection of an explicit causal candidate, favoring potential associations over the null hypothesis when evidence is ambiguous.
+
+\subsubsection{Decoupling Format Recognition from Content Accuracy}
+To understand the model's behavior, we decoupled the evaluation into two distinct dimensions: \textit{Format Recognition} (the ability to correctly identify answer cardinality) and \textit{Content Accuracy} (the semantic correctness of the answer).
+
+In terms of \textbf{Format Recognition}, the system exhibits a strong bias towards Single-Choice outputs (see Table \ref{tab:format_vs_accuracy}). The model achieved a high Recall of $85.2\%$ for identifying Single-Choice formats, but this came at the cost of significant under-generation in complex scenarios. In 80 instances, the model incorrectly treated a Multi-Choice question as a Single-Choice one, resulting in a low Recall of $57.9\%$ for the Multi-Choice format.
+
+However, this format confusion did not drastically impact the \textbf{Content Accuracy}, which remained remarkably stable (0.65 for Single vs. 0.63 for Multi). This stability can be attributed to an emergent \textbf{``Safety Bias.''} Since the evaluation metric awards partial credit ($0.5$ points) for subset matches, the model's tendency to halt after finding a single \texttt{SUFFICIENT} proof acts as a risk-minimization strategy. Much like a student avoiding penalties for incorrect guesses, the model prefers to secure points with one high-confidence answer rather than risking the selection of uncertain additional options. This effectively buffers the overall score against the lower format recall.
+
+\begin{table}[h]
+\centering
+\caption{Comparison of Format Detection Capability vs. Semantic Score.}
+\label{tab:format_vs_accuracy}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metric} & \textbf{Single-Choice} & \textbf{Multi-Choice} \\
+\midrule
+\multicolumn{3}{l}{\textit{Format Recognition (Cardinality)}} \\
+Format Precision & 0.691 & 0.780 \\
+Format Recall & 0.852 & 0.579 \\
+Format Confusion & 31 (Over-gen) & 80 (Under-gen) \\
+\midrule
+\multicolumn{3}{l}{\textit{Content Accuracy (Score)}} \\
+Average Score & \textbf{0.652} & \textbf{0.626} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

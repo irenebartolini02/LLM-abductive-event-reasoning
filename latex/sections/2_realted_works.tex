@@ -1,0 +1,9 @@
+\section{Related Works}
+The evolution of Large Language Models (LLMs) has significantly advanced the field of natural language understanding, yet complex reasoning remains a persistent challenge. Recent research has focused on enhancing these capabilities through structured frameworks and external knowledge integration.
+
+\subsection{Retrieval-Augmented Generation (RAG)}
+Standard RAG \cite{lewis2021retrievalaugmentedgenerationknowledgeintensivenlp} paradigms typically rely on a static "retrieve-then-generate" heuristic. This approach presupposes that a single retrieval phase can capture all necessary context. However, in causal inference tasks, this often becomes a bottleneck, leading to "hallucinations" when models attempt to bridge information gaps without sufficient evidence. Our work addresses this by implementing a hybrid retrieval engine that uses multi-view semantic search and heuristic keyword boosting to improve document recall.
+
+\subsection{Agentic Reasoning} Our work builds on the \textit{ReAct} paradigm \cite{yao2023reactsynergizingreasoningacting}, interleaving reasoning traces with actions. Following the principle of functional decoupling \cite{dua2022successivepromptingdecomposingcomplex}, we decompose the workflow into specialized Evidence Evaluator and Causal Reasoner components. This separation reduces cognitive load and prevents the conflation of evidence verification with final causal inference.
+
+\subsection{Graph-Based Methods} Recent frameworks like \textit{CausalRAG} \cite{wang2025causalrag} utilize Causal Knowledge Graphs (CKG) to model events and causal-temporal edges. By traversing these topologies, systems can recover multi-hop causal chains that standard RAG might miss. We implement this as an extension to evaluate the trade-offs between structural connectivity and the noise introduced during graph synthesis.

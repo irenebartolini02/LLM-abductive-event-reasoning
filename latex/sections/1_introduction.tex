@@ -1,0 +1,11 @@
+\section{Introduction}
+
+Abductive reasoning, the process of identifying the most plausible explanation for observed events, remains a significant challenge for Large Language Models (LLMs). While general performance has improved, complex causal inference requires verifying precise temporal details and actor sequences that standard architectures often overlook. In this work, we evaluate these reasoning capabilities using the SemEval 2026 Task 12 dataset.
+
+Current approaches largely rely on static Retrieval-Augmented Generation (RAG). However, our preliminary analysis reveals that even high-performing models suffer from hallucinations when restricted to a single retrieval pass, as initial queries often fail to capture the nuanced evidence required to distinguish correlation from causation. 
+To address these limitations, we propose and evaluate two distinct architectural paradigms for causal inference. Our contributions are:
+
+\begin{itemize}
+    \item \textbf{Decoupled Agentic Architecture:} We introduce a modular framework separating evidence gathering from inference. Powered by a \textbf{Hybrid Retrieval Strategy}, it employs a specialized Search Agent for targeted gap analysis to ensure precise context for causal deduction.
+    \item \textbf{CausalRAG Analysis:} We implement a graph-based extension utilizing \textbf{Causal Knowledge Graphs (CKG)} to capture multi-hop dependencies. We benchmark this against our text-based agent, providing a critical analysis of the trade-offs between structural reasoning and the noise sensitivity of automated graph construction.
+\end{itemize}

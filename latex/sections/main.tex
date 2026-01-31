@@ -1,0 +1,69 @@
+% This file compiles with both LuaLaTeX and XeLaTeX
+\documentclass[11pt]{article}
+
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+\usepackage[preprint]{acl}
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+%\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]
+%{hyperref}
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}  % Required for \mathbb
+
+
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+%\setlength\titlebox{<dim>}
+%
+% and set <dim> to something 5cm or larger.
+
+% These font selection commands work with
+% LuaLaTeX and XeLaTeX, but not pdfLaTeX.
+\usepackage[english,bidi=default]{babel} % English as the main language.
+
+
+%\usepackage{polyglossia}
+%\setdefaultlanguage{english}
+%\setotherlanguages{arabic,russian,thai,hindi,kannada}
+
+%%%%%%%%% PAPER ID  - PLEASE UPDATE
+\def\paperID{*****} % *** Enter the Paper ID here
+\def\confName{SemEval}
+\def\confYear{2026}
+
+
+\title{Iterative Evidence Retrieval and Abductive Reasoning: A Dual-Agent Framework for Causal Inference}
+
+%%%%%%%%% AUTHORS - PLEASE UPDATE
+\author{
+Simone Columbaro,
+Irene Bartolini,
+Alex Drapant,
+Lorenzo Brasolin,
+Shamim Zare\\
+Politecnico di Torino, Turin, Italy\\
+\textbf{\href{https://github.com/irenebartolini02/LLM-abductive-event-reasoning.git}{\textcolor{cvprblue}{GitHub Repository: LLM-abductive-event-reasoning}}}
+}
+
+\begin{document}
+
+\maketitle
+\input{sections/0_abstract}
+\input{sections/1_introduction}
+\input{sections/2_realted_works}
+\input{sections/3_methodology}
+\input{sections/4_exeriments}
+\input{sections/5_causalRAG}
+\input{sections/6_Conclusion_and_Discussion}
+
+\bibliography{custom}
+
+\end{document}
