@@ -3,7 +3,7 @@
 **Date:** January 2026  
 **Project:** SemEval 2026 Task 12 - Abductive Event Reasoning  
 **Institution:** Politecnico di Torino  
-**Status:** Active Development
+
 
 ---
 
@@ -249,27 +249,14 @@ Vector Store Indexing: Embed all node contents
 
 ---
 
-## 5. Implemented Models
+## 5. Utilities Module
 
-### 5.1 Evaluated Models
-
-| Model | Size | Type | Status |
-|-------|------|------|--------|
-| Qwen 2.5 | 7B | Instruct | ✅ Evaluated |
-| Gemma 2 | 9B | Instruct | ✅ Evaluated |
-| Hermes 3 | 7B | Instruct | ✅ Evaluated |
-| Solar | 10.7B | Instruct | ✅ Evaluated |
-
----
-
-## 6. Utilities Module
-
-### 6.1 `data_loader.py`
+### 5.1 `data_loader.py`
 - **load_jsonl()**: Loads line-delimited JSON files
 - **load_json()**: Loads standard JSON files
 - **index_docs_by_topic()**: Groups documents by topic_id
 
-### 6.2 `model_utils.py`
+### 5.2 `model_utils.py`
 - **load_model()**: Initializes quantized LLM with proper config
 - **format_qwen_prompt()**: Structures prompts using official template
 
@@ -278,7 +265,7 @@ Vector Store Indexing: Embed all node contents
 - Context truncation to max_total_chars
 - Official Qwen/Llama chat template application
 
-### 6.3 `output_utils.py`
+### 5.3 `output_utils.py`
 - **clean_response()**: Extracts letters A-D from any text format
 - **calculate_score()**: Computes exact/partial/wrong scoring
   ```
@@ -290,9 +277,9 @@ Vector Store Indexing: Embed all node contents
 
 ---
 
-## 7. Evaluation Framework
+## 6. Evaluation Framework
 
-### 7.1 Dataset Structure
+### 6.1 Dataset Structure
 
 **questions.jsonl**:
 ```json
@@ -321,7 +308,7 @@ Vector Store Indexing: Embed all node contents
 ]
 ```
 
-### 7.2 Checkpoint Management
+### 6.2 Checkpoint Management
 
 **Purpose**: Resume evaluation from checkpoints to avoid recomputation
 
@@ -348,7 +335,7 @@ Vector Store Indexing: Embed all node contents
 - Running statistics update
 - Wandb integration for remote logging
 
-### 7.3 Metrics
+### 6.3 Metrics
 
 **Scoring System**:
 - **Exact Match (1.0)**: All predicted letters are correct and complete
@@ -366,9 +353,9 @@ Weighted Score:  (X + 0.5*Y) / N %
 
 ---
 
-## 8. Advanced Features
+## 7. Advanced Features
 
-### 8.1 Iterative Search Loop
+### 7.1 Iterative Search Loop
 
 ```
 Initial Context
@@ -388,7 +375,7 @@ Final Answer
 
 ---
 
-## 9. Setup & Installation
+## 8. Setup & Installation
 
 **Prerequisites**:
 - Python 3.9 or higher
@@ -411,7 +398,7 @@ pip install -r requirements.txt
 - `pandas`, `numpy` - Data processing
 
 
-## 10 Execute Evaluation
+## 9 Execute Evaluation
 
 **Main Entry Point**: `run_eval.py`
 
@@ -420,7 +407,7 @@ pip install -r requirements.txt
 python run_eval.py
 ```
 
-### 10.1 Configuration
+### 9.1 Configuration
 
 To modify evaluation parameters, edit the configuration section in `run_eval.py`:
 - `dataset_path`: Path to the unzipped dataset folder
@@ -433,9 +420,9 @@ To modify evaluation parameters, edit the configuration section in `run_eval.py`
  
 ---
 
-## 11. Performance & Results
+## 10. Performance & Results
 
-### 11.1 Evaluation Metrics
+### 10.1 Evaluation Metrics
 
 Results are saved in checkpoint format (JSONL) with the following fields:
 - `uuid`: Question ID
