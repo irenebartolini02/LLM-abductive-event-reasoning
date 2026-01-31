@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Dict, List
 
  
-def load_jsonl(path: Path) -> List[Dict]:
+def load_jsonl(path) -> List[Dict]:
     """Read a .jsonl file into a list of dicts."""
     items = []
-    with path.open("r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -16,9 +16,9 @@ def load_jsonl(path: Path) -> List[Dict]:
             items.append(json.loads(line))
     return items
 
-def load_json(path: Path):
+def load_json(path):
   """Read a .json file."""
-  with path.open("r", encoding="utf-8") as f:
+  with open(path,"r", encoding="utf-8") as f:
       return json.load(f)
 
 def index_docs_by_topic(docs_list: List[Dict]) -> Dict[int, List[Dict]]:
