@@ -1,5 +1,7 @@
 # LLM Abductive Event Reasoning - Project Report
 
+![System Overview](assets/agent_structure_baseline.png)
+
 **Date:** January 2026  
 **Project:** SemEval 2026 Task 12 - Abductive Event Reasoning  
 **Institution:** Politecnico di Torino  
